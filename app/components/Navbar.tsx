@@ -25,16 +25,16 @@ export default function Navbar() {
 
         {/* Desktop Navigation Links */}
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-300">
-          <a href="#about" className="hover:text-amber-400 transition">About</a>
-          <a href="#featured" className="hover:text-amber-400 transition">Featured</a>
-          <a href="#faq" className="hover:text-amber-400 transition">FAQ</a>
-          <a href="#contact" className="hover:text-amber-400 transition">Contact</a>
+          <Link href="#about" className="hover:text-amber-400 transition">About</Link>
+          <Link href="#featured" className="hover:text-amber-400 transition">Featured</Link>
+          <Link href="#faq" className="hover:text-amber-400 transition">FAQ</Link>
+          <Link href="#contact" className="hover:text-amber-400 transition">Contact</Link>
           {session ? (
-            <Link href="/profile" className="text-amber-400 font-bold hover:underline">
+            <Link href="/client/profile" className="text-amber-400 font-bold hover:underline">
               My Account
             </Link>
           ) : (
-            <Link href="/login" className="hover:text-amber-400 transition">
+            <Link href="/client/login" className="hover:text-amber-400 transition">
               Sign In
             </Link>
           )}
