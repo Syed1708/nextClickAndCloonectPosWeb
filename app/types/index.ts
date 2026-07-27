@@ -1,13 +1,3 @@
-// export interface Product {
-//   id: number;
-//   name: string;
-//   description: string;
-//   price: number;
-//   image: string | null;
-//   is_active: boolean;
-//   category_id?: number;
-// }
-
 export interface Product {
   id: number;
   name: string;
@@ -20,10 +10,32 @@ export interface Product {
   category_id?: number;
   category_name?: string;
 }
-export interface Review {
+
+export interface ClientProfile {
   id: number;
   name: string;
-  comment: string;
-  rating: number;
-  date: string;
+  email: string;
+  phone?: string | null;
+  address?: string | null;
+}
+
+export interface OrderItem {
+  id: number;
+  product_id: number;
+  product_name?: string;
+  name?: string;
+  quantity: number;
+  unit_price?: number;
+  price?: number;
+}
+
+export interface Order {
+  id: number;
+  sequence_number?: number;
+  preparation_status?: string;
+  status?: string;
+  total_amount?: number;
+  total_incl_vat?: number;
+  created_at: string;
+  items?: OrderItem[];
 }

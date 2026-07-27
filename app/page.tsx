@@ -2,57 +2,32 @@ import Link from 'next/link';
 import Image from 'next/image';
 import HeroSlider from './components/HeroSlider';
 import { fetchMenu, getImageUrl, formatPrice } from './lib/api';
-import { ShoppingBag, ArrowRight } from 'lucide-react';
-import { getServerSession } from 'next-auth';
-import { authOptions } from './api/auth/[...nextauth]/route';
+import HowItWorks from './components/home/HowItWorks';
+import FaqSection from './components/home/FaqSection';
+import NewsletterBanner from './components/home/NewsletterBanner';
+import WhyChooseUs from './components/home/WhyChooseUs';
+import ContactSection from './components/home/ContactSection';
+import Navbar from './components/Navbar';
+import { ArrowRight } from 'lucide-react';
+import { Product } from './types';
 
 export default async function HomePage() {
-  const session = await getServerSession(authOptions);
 
   const allProducts = await fetchMenu();
   const featuredProducts = allProducts.filter((p) => p.is_active ?? true).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
-      <nav className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-zinc-950 font-black text-xl">
-              BP
-            </div>
-            <span className="text-xl font-extrabold tracking-tight">Burger Palace</span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-300">
-            <a href="#about" className="hover:text-amber-400 transition">About</a>
-            <a href="#featured" className="hover:text-amber-400 transition">Featured</a>
-            <a href="#contact" className="hover:text-amber-400 transition">Contact</a>
-            {
-              session?.user ? (
-
-                <Link href="/profile" className="hover:text-amber-400 transition">My Account</Link>
-              ) : (
-                <Link href="/login" className="text-xs font-semibold text-zinc-300 hover:text-amber-400">
-                  Sign In
-                </Link>
-              )
-            }
-          </div>
-
-          <Link
-            href="/order"
-            className="bg-amber-500 hover:bg-amber-400 text-zinc-950 px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 transition"
-          >
-            <ShoppingBag className="w-4 h-4" /> Order Online
-          </Link>
-        </div>
-      </nav>
+     
+      <Navbar />
 
       {/* Hero Section */}
       <section className="py-12 md:py-16 max-w-7xl mx-auto px-6 w-full">
         <HeroSlider />
       </section>
 
+      {/* 3. How It Works Section */}
+      <HowItWorks />
       {/* Featured Products Grid */}
       <section id="featured" className="py-16 bg-zinc-900/40 border-y border-zinc-800/50">
         <div className="max-w-7xl mx-auto px-6">
@@ -67,7 +42,7 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product: any) => (
+            {featuredProducts.map((product: Product) => (
               <div key={product.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between">
                 <div className="relative h-48 w-full bg-zinc-800">
                   <Image src={getImageUrl(product.image)} alt={product.name} fill className="object-cover" />
@@ -97,6 +72,19 @@ export default async function HomePage() {
         </div>
       </section>
 
+
+      {/* 5. Why Choose Us Section */}
+      <WhyChooseUs />
+
+      {/* 6. Newsletter / Promo Banner */}
+      <NewsletterBanner />
+
+      {/* 7. FAQ Section */}
+      <section id="faq">
+        <FaqSection />
+      </section>
+
+      <ContactSection />
       {/* Footer */}
       <footer className="bg-zinc-950 border-t border-zinc-800 py-8 text-center text-xs text-zinc-600">
         <p>© {new Date().getFullYear()} Burger Palace Bordeaux. SIRET: 892 143 567 00012</p>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { Session } from 'next-auth';
 import Link from 'next/link';
 import RealtimeTracker from '../components/RealtimeTracker';
 import {
@@ -18,19 +19,21 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
+import { ClientProfile, Order } from '../types';
 
+interface ClientDashboardShellProps {
+  session: Session | null;
+  clientProfile: ClientProfile | null;
+  initialOrders: Order[];
+}
 export default function ClientDashboardShell({
   session,
   clientProfile,
   initialOrders,
-}: {
-  session: any;
-  clientProfile: any;
-  initialOrders: any[];
-}) {
+}: ClientDashboardShellProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'tracker' | 'orders' | 'profile'>('tracker');
-  const [orders] = useState<any[]>(initialOrders);
+  const [orders] = useState<Order[]>(initialOrders);
 
   // 🚀 Initialize form with FRESH MySQL data from clientProfile prop!
   const [profileData, setProfileData] = useState({
@@ -51,7 +54,7 @@ export default function ClientDashboardShell({
       o.status !== 'delivered'
   );
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
     setSavedSuccess(false);
@@ -197,7 +200,7 @@ export default function ClientDashboardShell({
             <div className="space-y-6">
               <h2 className="text-xl font-extrabold tracking-tight">Order History ({orders.length})</h2>
               <div className="space-y-4">
-                {orders.map((order: any) => (
+                {orders.map((order: Order) => (
                   <div key={order.id} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-4">
                     <div className="flex justify-between items-center text-sm border-b border-zinc-800 pb-3">
                       <div>

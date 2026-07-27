@@ -4,7 +4,16 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShoppingBag, Plus, Minus, ArrowLeft, Search, Loader2, Lock, X } from 'lucide-react';
+import {
+  ShoppingBag,
+  Plus,
+  Minus,
+  ArrowLeft,
+  Search,
+  Loader2,
+  Lock,
+  X,
+} from 'lucide-react';
 import { Product } from '../types';
 import { getImageUrl, formatPrice } from '../lib/api';
 
@@ -25,19 +34,20 @@ export default function OrderClientShell({
 
   const [products] = useState<Product[]>(initialProducts);
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
-  
-  // Search & Category Filters
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [visibleCount, setVisibleCount] = useState(10);
-  
+
+  // Modals state
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Dynamic Categories from Server Data
-  const categories = ['All', ...Array.from(new Set(products.map((p) => p.category_name || 'Burgers')))];
+  const categories = [
+    'All',
+    ...Array.from(new Set(products.map((p) => p.category_name || 'Burgers'))),
+  ];
 
-  // Filter Products
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory =
@@ -70,13 +80,15 @@ export default function OrderClientShell({
   };
 
   const totalAmount = cart.reduce((sum, item) => {
-    const priceVal = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
+    const priceVal = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
     return sum + priceVal * item.quantity;
   }, 0);
 
-  // CHECKOUT USING SERVER-PASSED AUTH PROPS
- const handleProceedToCheckout = async () => {
+  const totalItemsCount = cart.reduce((a, c) => a + c.quantity, 0);
+
+  const handleProceedToCheckout = async () => {
     if (!isLoggedIn || !accessToken) {
+      setIsMobileCartOpen(false);
       setShowAuthModal(true);
       return;
     }
@@ -90,46 +102,41 @@ export default function OrderClientShell({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`, // Sanctum Client Token
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            // 🚀 FIX: Sending 'cart' instead of 'items' to match Laravel validation!
-            cart: cart.map((item) => ({
-              id: item.product.id,
-              quantity: item.quantity,
-            })),
+            cart: cart.map((item) => ({ id: item.product.id, quantity: item.quantity })),
           }),
         }
       );
 
       const data = await response.json();
-
-      if (response.ok && data.url) {
-        // Redirect directly to Stripe's secure checkout URL
+      if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || data.message || 'Could not launch Stripe payment session');
+        alert(data.message || 'Could not launch Stripe Checkout session');
       }
     } catch (err) {
-      console.error('Checkout error:', err);
-      alert('An error occurred connecting to payment service');
+      console.error(err);
+      alert('Error connecting to payment provider');
     } finally {
       setIsProcessingCheckout(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm font-medium">
-          <ArrowLeft className="w-5 h-5" /> Back to Home
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col font-sans relative">
+      {/* Header */}
+      <header className="border-b border-zinc-800 bg-zinc-900/90 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between">
+        <Link href="/" className="text-zinc-400 hover:text-white flex items-center gap-1.5 text-xs sm:text-sm font-medium">
+          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" /> Home
         </Link>
-        <h1 className="text-lg font-extrabold tracking-tight">Burger Palace Menu</h1>
-        <div className="flex items-center gap-4">
+        <h1 className="text-sm sm:text-lg font-black tracking-tight">Burger Palace Menu</h1>
+
+        <div className="flex items-center gap-2 sm:gap-4">
           {isLoggedIn ? (
             <Link href="/profile" className="text-xs font-bold text-amber-400 hover:underline">
-              Welcome, {userName || 'Account'}
+              {userName || 'Account'}
             </Link>
           ) : (
             <Link href="/login" className="text-xs font-semibold text-zinc-300 hover:text-amber-400">
@@ -137,31 +144,36 @@ export default function OrderClientShell({
             </Link>
           )}
 
-          <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 px-4 py-2 rounded-full font-semibold text-sm">
+          {/* Cart Pill in Header (Triggers Mobile Cart Sheet on Mobile/Tablet) */}
+          <button
+            onClick={() => setIsMobileCartOpen(true)}
+            className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm hover:bg-amber-500/20 transition"
+          >
             <ShoppingBag className="w-4 h-4" />
-            <span>Cart ({cart.reduce((a, c) => a + c.quantity, 0)})</span>
-          </div>
+            <span>Cart ({totalItemsCount})</span>
+          </button>
         </div>
       </header>
 
-      {/* Main Workspace */}
-      <div className="flex-1 max-w-7xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Menu Section */}
+      {/* Main Container */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+        
+        {/* Left: Product Catalog */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div className="relative">
-              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 type="text"
                 placeholder="Search burgers, sides, drinks..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-amber-500"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-500"
               />
             </div>
 
-            {/* Category Chips */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {/* Scrollable Category Chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
               {categories.map((cat) => (
                 <button
                   key={cat}
@@ -169,7 +181,7 @@ export default function OrderClientShell({
                     setSelectedCategory(cat);
                     setVisibleCount(10);
                   }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                  className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                     selectedCategory === cat
                       ? 'bg-amber-500 text-zinc-950'
                       : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white'
@@ -182,33 +194,35 @@ export default function OrderClientShell({
           </div>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {displayedProducts.map((product) => {
-              const displayPrice = formatPrice(product.price || (product as any).unit_price);
+              const displayPrice = formatPrice(product.price || (product as Product).unit_price);
 
               return (
                 <div key={product.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between">
-                  <div className="relative h-44 w-full bg-zinc-800">
+                  <div className="relative h-36 sm:h-44 w-full bg-zinc-800">
                     <Image src={getImageUrl(product.image)} alt={product.name} fill className="object-cover" />
                   </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between">
+                  <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
                     <div>
                       {product.category_name && (
-                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-amber-500 uppercase tracking-wider">
                           {product.category_name}
                         </span>
                       )}
                       <div className="flex justify-between items-start mt-0.5">
-                        <h3 className="font-bold text-base text-white">{product.name}</h3>
-                        <span className="text-amber-400 font-extrabold text-base">€{displayPrice}</span>
+                        <h3 className="font-bold text-sm sm:text-base text-white">{product.name}</h3>
+                        <span className="text-amber-400 font-extrabold text-sm sm:text-base">€{displayPrice}</span>
                       </div>
-                      <p className="text-zinc-400 text-xs mt-1 line-clamp-2">{product.description || 'Prepared fresh on demand.'}</p>
+                      <p className="text-zinc-400 text-[11px] sm:text-xs mt-1 line-clamp-2">
+                        {product.description || 'Prepared fresh on demand.'}
+                      </p>
                     </div>
                     <button
                       onClick={() => addToCart(product)}
-                      className="mt-4 w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition"
+                      className="mt-3 sm:mt-4 w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition"
                     >
-                      <Plus className="w-4 h-4" /> Add to Order
+                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add to Order
                     </button>
                   </div>
                 </div>
@@ -216,28 +230,28 @@ export default function OrderClientShell({
             })}
           </div>
 
-          {/* Pagination Load More */}
+          {/* Load More Pagination */}
           {visibleCount < filteredProducts.length && (
-            <div className="text-center pt-6">
+            <div className="text-center pt-4 sm:pt-6">
               <button
                 onClick={() => setVisibleCount((prev) => prev + 10)}
-                className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 px-8 py-3 rounded-xl font-bold text-xs transition"
+                className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold text-xs transition"
               >
-                Load More Products ({filteredProducts.length - visibleCount} remaining)
+                Load More ({filteredProducts.length - visibleCount} remaining)
               </button>
             </div>
           )}
         </div>
 
-        {/* Order Summary & Stripe Button */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 h-fit sticky top-24 space-y-6">
-          <h2 className="text-lg font-bold border-b border-zinc-800 pb-3">Your Order</h2>
+        {/* Right: Desktop Cart Column */}
+        <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-3xl p-6 h-fit sticky top-24 space-y-6">
+          <h2 className="text-lg font-bold border-b border-zinc-800 pb-3">Your Order Summary</h2>
           {cart.length === 0 ? (
             <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
           ) : (
             <div className="space-y-4 max-h-75 overflow-y-auto pr-2">
               {cart.map((item) => {
-                const itemPrice = formatPrice(item.product.price || (item.product as any).unit_price);
+                const itemPrice = formatPrice(item.product.price || (item.product as Product).unit_price);
                 return (
                   <div key={item.product.id} className="flex items-center justify-between text-sm">
                     <div>
@@ -276,16 +290,112 @@ export default function OrderClientShell({
         </div>
       </div>
 
+      {/* 🚀 FLOATING SHOPPING BAG BUTTON FOR MOBILE / TABLET */}
+      {totalItemsCount > 0 && (
+        <button
+          onClick={() => setIsMobileCartOpen(true)}
+          className="lg:hidden fixed bottom-6 right-6 z-40 bg-amber-500 hover:bg-amber-400 text-zinc-950 p-4 rounded-full shadow-2xl flex items-center justify-center transition transform active:scale-95"
+          aria-label="View Order Details"
+        >
+          <ShoppingBag className="w-6 h-6" />
+          <span className="absolute -top-1 -right-1 bg-zinc-950 text-amber-400 font-black text-xs w-6 h-6 rounded-full flex items-center justify-center border-2 border-amber-500">
+            {totalItemsCount}
+          </span>
+        </button>
+      )}
+
+      {/* 🚀 MOBILE / TABLET SLIDE-UP CART DRAWER (SHEET) */}
+      {isMobileCartOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end lg:hidden animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-5 sm:p-6 space-y-5 max-h-[85vh] flex flex-col shadow-2xl">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-amber-500" />
+                <h2 className="text-base sm:text-lg font-extrabold text-white">
+                  Your Order Details ({totalItemsCount})
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsMobileCartOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-white bg-zinc-800 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Item List */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {cart.length === 0 ? (
+                <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
+              ) : (
+                cart.map((item) => {
+                  const itemPrice = formatPrice(item.product.price || (item.product as Product).unit_price);
+                  return (
+                    <div
+                      key={item.product.id}
+                      className="flex items-center justify-between bg-zinc-950 border border-zinc-800/80 p-3.5 rounded-2xl"
+                    >
+                      <div className="pr-2 min-w-0">
+                        <p className="font-bold text-sm text-white truncate">{item.product.name}</p>
+                        <p className="text-amber-400 text-xs font-semibold mt-0.5">€{itemPrice} each</p>
+                      </div>
+
+                      {/* Quantity Controls inside Drawer */}
+                      <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1.5 rounded-xl shrink-0">
+                        <button
+                          onClick={() => removeFromCart(item.product.id)}
+                          className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="font-extrabold text-xs px-1.5">{item.quantity}</span>
+                        <button
+                          onClick={() => addToCart(item.product)}
+                          className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Drawer Footer with Total & Checkout */}
+            <div className="border-t border-zinc-800 pt-4 space-y-4">
+              <div className="flex justify-between items-center font-black text-lg">
+                <span className="text-white">Total Amount:</span>
+                <span className="text-amber-400 text-xl">€{totalAmount.toFixed(2)}</span>
+              </div>
+
+              <button
+                disabled={cart.length === 0 || isProcessingCheckout}
+                onClick={handleProceedToCheckout}
+                className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
+              >
+                {isProcessingCheckout ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  'Proceed to Stripe Checkout'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Auth Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-sm w-full text-center relative">
-            <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative">
+            <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-zinc-500">
               <X className="w-5 h-5" />
             </button>
             <Lock className="w-10 h-10 text-amber-400 mx-auto mb-3" />
             <h3 className="text-xl font-extrabold">Login Required</h3>
-            <p className="text-zinc-400 text-xs mt-2">Please sign in to your customer account to complete payment.</p>
+            <p className="text-zinc-400 text-xs mt-2">Please sign in to place a Click & Collect order.</p>
             <button
               onClick={() => router.push('/login')}
               className="w-full bg-amber-500 text-zinc-950 font-bold py-3 rounded-xl text-sm mt-6"
