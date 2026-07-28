@@ -1,15 +1,15 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import HeroSlider from './components/HeroSlider';
-import { fetchMenu, getImageUrl, formatPrice } from './lib/api';
-import HowItWorks from './components/home/HowItWorks';
-import FaqSection from './components/home/FaqSection';
-import NewsletterBanner from './components/home/NewsletterBanner';
-import WhyChooseUs from './components/home/WhyChooseUs';
-import ContactSection from './components/home/ContactSection';
-import Navbar from './components/Navbar';
+import HeroSlider from '@/components/HeroSlider';
+import { fetchMenu, getImageUrl, formatPrice } from '@/lib/api';
+import HowItWorks from '@/components/home/HowItWorks';
+import FaqSection from '@/components/home/FaqSection';
+import NewsletterBanner from '@/components/home/NewsletterBanner';
+import WhyChooseUs from '@/components/home/WhyChooseUs';
+import ContactSection from '@/components/home/ContactSection';
+import Navbar from '@/components/Navbar';
 import { ArrowRight } from 'lucide-react';
-import { Product } from './types';
+import { Product } from '@/types';
 
 export default async function HomePage() {
 

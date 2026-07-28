@@ -1,13 +1,13 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
-import ClientDashboardShell from '../components/ProfileClientShell';
+import ClientDashboardShell from '@/components/ProfileClientShell';
 
 export default async function ProfileSSRPage() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
-    redirect('/login');
+    redirect('/client/login');
   }
 
   const token = (session as any).accessToken;

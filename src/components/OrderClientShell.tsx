@@ -139,7 +139,7 @@ export default function OrderClientShell({
               {userName || 'Account'}
             </Link>
           ) : (
-            <Link href="/login" className="text-xs font-semibold text-zinc-300 hover:text-amber-400">
+            <Link href="/client/login" className="text-xs font-semibold text-zinc-300 hover:text-amber-400">
               Sign In
             </Link>
           )}
@@ -397,7 +397,7 @@ export default function OrderClientShell({
             <h3 className="text-xl font-extrabold">Login Required</h3>
             <p className="text-zinc-400 text-xs mt-2">Please sign in to place a Click & Collect order.</p>
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/client/login')}
               className="w-full bg-amber-500 text-zinc-950 font-bold py-3 rounded-xl text-sm mt-6"
             >
               Sign In Now

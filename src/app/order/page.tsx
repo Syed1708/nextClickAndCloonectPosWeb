@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { fetchMenu } from '../lib/api';
-import OrderClientShell from '../components/OrderClientShell';
+import { fetchMenu } from '@/lib/api';
+import OrderClientShell from '@/components/OrderClientShell';
 
 export const revalidate = 60; // SSR Incremental Static Regeneration
 

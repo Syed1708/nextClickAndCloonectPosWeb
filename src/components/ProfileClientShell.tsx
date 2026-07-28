@@ -62,7 +62,7 @@ export default function ClientDashboardShell({
     try {
       const token = session?.accessToken;
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/client/profile`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/Api/v1/client/profile`,
         {
           method: 'PUT',
           headers: {
@@ -111,7 +111,7 @@ export default function ClientDashboardShell({
               <ShoppingBag className="w-4 h-4" /> Order Online
             </Link>
             <button
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => signOut({ callbackUrl: '/client/login' })}
               className="bg-zinc-900 hover:bg-red-500/10 hover:text-red-400 border border-zinc-800 text-zinc-400 px-4 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition"
             >
               <LogOut className="w-4 h-4" /> Sign Out
