@@ -26,24 +26,38 @@ body {
 }
 
 
-/* 🚀 THERMAL PRINTER STYLES */
+/* 🚀 FOOLPROOF THERMAL PRINT CSS */
+#thermal-print-area {
+  display: none;
+}
+
 @media print {
-  body * {
-    visibility: hidden !important;
-  }
-  
-  #thermal-receipt,
-  #thermal-receipt * {
-    visibility: visible !important;
+  /* 1. Hide the Next.js app and dark mode background during print */
+  body > * {
+    display: none !important;
   }
 
-  #thermal-receipt {
+  /* 2. Show ONLY the thermal print container */
+  #thermal-print-area {
+    display: block !important;
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 80mm !important;
     margin: 0 !important;
-    padding: 8px !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* 3. Force all text inside receipt to be pure black on white */
+  #thermal-print-area,
+  #thermal-print-area * {
+    visibility: visible !important;
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   @page {

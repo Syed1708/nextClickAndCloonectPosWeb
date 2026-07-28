@@ -2,24 +2,26 @@ import { Product } from '@/types';
 import { formatPrice } from './api';
 
 export function buildOrderSyncPayload(
-  cart: { product: Product; quantity: number }[],
+  cart: { product: Product; quantity: number; notes?: string[]; extraPrice?: number }[],
   paymentMethod: 'cash' | 'card' | 'split',
   orderType: 'dine_in' | 'takeaway',
   customerName?: string,
   customerPhone?: string | null,
-  splitDetails?: { cashAmount: number; cardAmount: number } // 🚀 Split Payment details
+  splitDetails?: { cashAmount: number; cardAmount: number }
 ) {
   let totalInclVatSum = 0;
   let subtotalExclVatSum = 0;
   let totalVatAmountSum = 0;
 
   const itemsPayload = cart.map((item) => {
-    const unitPrice = parseFloat(
+    const baseUnitPrice = parseFloat(
       formatPrice(item.product.price || (item.product as any).unit_price)
     );
+    // 🚀 Include paid suppléments in unit price
+    const unitPrice = baseUnitPrice + (item.extraPrice || 0);
 
     const vatRate = parseFloat(
-      String(item.product.vat_rate || (item.product as any).vat_rate || '10.00')
+      String(item.product.vat_rate || (item.product as any).tax_rate || '10.00')
     );
 
     const lineTotalTtc = unitPrice * item.quantity;
@@ -30,9 +32,12 @@ export function buildOrderSyncPayload(
     subtotalExclVatSum += lineSubtotalHt;
     totalVatAmountSum += lineVatAmount;
 
+    // 🚀 Appends notes to product_name so KDS screens render them in yellow!
+    const notesText = item.notes && item.notes.length > 0 ? ` [${item.notes.join(', ')}]` : '';
+
     return {
       product_id: item.product.id,
-      product_name: item.product.name,
+      product_name: `${item.product.name}${notesText}`,
       quantity: item.quantity,
       unit_price: unitPrice,
       vat_rate: vatRate,
@@ -40,7 +45,6 @@ export function buildOrderSyncPayload(
     };
   });
 
-  // 🚀 Format Payments Array for Laravel OrderSyncController
   let paymentsPayload = [];
   if (paymentMethod === 'split' && splitDetails) {
     paymentsPayload = [
@@ -59,7 +63,7 @@ export function buildOrderSyncPayload(
     orders: [
       {
         uuid: orderUuid,
-        sequence_number: 0, // Server auto-assigns 1, 2, 3...
+        sequence_number: 0,
         subtotal_excl_vat: parseFloat(subtotalExclVatSum.toFixed(2)),
         vat_amount: parseFloat(totalVatAmountSum.toFixed(2)),
         total_incl_vat: parseFloat(totalInclVatSum.toFixed(2)),
@@ -70,7 +74,7 @@ export function buildOrderSyncPayload(
         hash: null,
         previous_hash: null,
         items: itemsPayload,
-        payments: paymentsPayload, // 🚀 Contains 1 or 2 payment records!
+        payments: paymentsPayload,
       },
     ],
   };

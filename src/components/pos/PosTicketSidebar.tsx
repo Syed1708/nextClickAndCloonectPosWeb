@@ -11,7 +11,6 @@ import {
   Banknote,
   User,
   Phone,
-  Loader2,
   Split,
   AlertTriangle,
 } from 'lucide-react';
@@ -19,6 +18,8 @@ import {
 interface PosCartItem {
   product: Product;
   quantity: number;
+  notes?: string[];
+  extraPrice?: number;
 }
 
 interface PosTicketSidebarProps {
@@ -36,8 +37,8 @@ interface PosTicketSidebarProps {
   onSetSplitCashAmount: (value: string) => void;
   onSetCustomerName: (value: string) => void;
   onSetCustomerPhone: (value: string) => void;
-  onAddToCart: (product: Product) => void;
-  onRemoveFromCart: (productId: number) => void;
+  onAddToCart: (product: Product, notes?: string[], extraPrice?: number) => void;
+  onRemoveFromCart: (product: Product, notes?: string[]) => void;
   onClearCart: () => void;
   onChargeOrder: () => void;
 }
@@ -62,24 +63,24 @@ export default function PosTicketSidebar({
   onClearCart,
   onChargeOrder,
 }: PosTicketSidebarProps) {
+  // 🚀 TOTAL AMOUNT INCLUDES PAID EXTRAS!
   const totalAmount = cart.reduce((sum, item) => {
-    const priceVal = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
-    return sum + priceVal * item.quantity;
+    const basePrice = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
+    const unitPriceWithExtra = basePrice + (item.extraPrice || 0);
+    return sum + unitPriceWithExtra * item.quantity;
   }, 0);
 
   const cashGivenNum = parseFloat(cashGiven) || 0;
   const changeDue = Math.max(0, cashGivenNum - totalAmount);
 
-  // 🚀 CASH VALIDATION GUARD: Disables charge button if cash received is less than total
+  // Validation Guard
   const isCashInsufficient = paymentMethod === 'cash' && cashGivenNum < totalAmount;
-
-  // 🚀 SPLIT PAYMENT CALCULATIONS
   const splitCashNum = parseFloat(splitCashAmount) || 0;
   const splitCardNum = Math.max(0, totalAmount - splitCashNum);
   const isSplitInvalid = paymentMethod === 'split' && (splitCashNum <= 0 || splitCashNum >= totalAmount);
 
   return (
-    <aside className="w-80 sm:w-96 md:w-95 bg-zinc-900 border-l border-zinc-800 flex flex-col justify-between shrink-0">
+    <aside className="w-80 sm:w-96 md:w-[380px] bg-zinc-900 border-l border-zinc-800 flex flex-col justify-between shrink-0 font-sans">
       {/* Header & Order Type */}
       <div className="p-3 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/50">
         <div className="flex bg-zinc-950 border border-zinc-800 p-1 rounded-xl gap-1">
@@ -135,40 +136,56 @@ export default function PosTicketSidebar({
         </div>
       </div>
 
-      {/* Items List */}
+      {/* Cart Items List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-zinc-600 space-y-2">
             <ShoppingBag className="w-8 h-8 stroke-1" />
-            <p className="text-xs font-medium">Tap products to build active ticket</p>
+            <p className="text-xs font-medium">Tap product tiles to build active ticket</p>
           </div>
         ) : (
-          cart.map((item) => {
-            const itemPrice = formatPrice(item.product.price || (item.product as any).unit_price);
-            const subtotal = (parseFloat(itemPrice) * item.quantity).toFixed(2);
+          cart.map((item, idx) => {
+            const basePrice = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
+            
+            // 🚀 INCLUDES PAID EXTRAS IN UNIT PRICE DISPLAY
+            const unitPriceWithExtra = basePrice + (item.extraPrice || 0);
+            const subtotal = (unitPriceWithExtra * item.quantity).toFixed(2);
+
+            // 🚀 UNIQUE REACT KEY (Fixes duplicate key warning!)
+            const uniqueKey = `${item.product.id}-${(item.notes || []).join('-')}-${idx}`;
 
             return (
               <div
-                key={item.product.id}
+                key={uniqueKey}
                 className="bg-zinc-950 border border-zinc-800/80 p-2.5 rounded-xl flex items-center justify-between text-xs"
               >
                 <div className="min-w-0 flex-1 pr-2">
                   <p className="font-bold text-white truncate">{item.product.name}</p>
-                  <p className="text-zinc-500 text-[10px]">€{itemPrice} x {item.quantity}</p>
+
+                  {/* 🚀 DISPLAY MODIFIER NOTES */}
+                  {item.notes && item.notes.length > 0 && (
+                    <p className="text-amber-400 font-semibold text-[10px] truncate mt-0.5">
+                      {item.notes.join(', ')}
+                    </p>
+                  )}
+
+                  <p className="text-zinc-500 text-[10px] mt-0.5">
+                    €{unitPriceWithExtra.toFixed(2)} x {item.quantity}
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="font-black text-amber-400 pr-1">€{subtotal}</span>
                   <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
                     <button
-                      onClick={() => onRemoveFromCart(item.product.id)}
+                      onClick={() => onRemoveFromCart(item.product, item.notes || [])}
                       className="p-1 text-zinc-400 hover:text-white"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
                     <span className="font-bold text-xs px-1">{item.quantity}</span>
                     <button
-                      onClick={() => onAddToCart(item.product)}
+                      onClick={() => onAddToCart(item.product, item.notes || [], item.extraPrice || 0)}
                       className="p-1 text-zinc-400 hover:text-white"
                     >
                       <Plus className="w-3 h-3" />
@@ -181,7 +198,7 @@ export default function PosTicketSidebar({
         )}
       </div>
 
-      {/* 🚀 PAYMENT SELECTOR (CARD, CASH, MIXTE/SPLIT) */}
+      {/* Payment Selector & Calculator */}
       <div className="p-3.5 border-t border-zinc-800 space-y-3 bg-zinc-950">
         <div className="grid grid-cols-3 gap-1.5">
           <button
@@ -216,7 +233,7 @@ export default function PosTicketSidebar({
           </button>
         </div>
 
-        {/* CASH PAYMENT CALCULATOR & VALIDATION */}
+        {/* CASH CALCULATOR */}
         {paymentMethod === 'cash' && (
           <div className="space-y-2 bg-zinc-900 p-2.5 rounded-xl border border-zinc-800 text-xs">
             <div className="flex justify-between items-center">
@@ -256,7 +273,7 @@ export default function PosTicketSidebar({
           </div>
         )}
 
-        {/* 🚀 MIXTE / SPLIT PAYMENT CALCULATOR */}
+        {/* MIXTE / SPLIT CALCULATOR */}
         {paymentMethod === 'split' && (
           <div className="space-y-2 bg-zinc-900 p-2.5 rounded-xl border border-zinc-800 text-xs">
             <div className="flex justify-between items-center">
@@ -288,13 +305,7 @@ export default function PosTicketSidebar({
             onClick={onChargeOrder}
             className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-black py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition"
           >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : isCashInsufficient ? (
-              'Insufficient Cash'
-            ) : (
-              <>Charge & Send to Kitchen (€{totalAmount.toFixed(2)})</>
-            )}
+            {isSubmitting ? 'Processing...' : `Charge & Send (€${totalAmount.toFixed(2)})`}
           </button>
         </div>
       </div>

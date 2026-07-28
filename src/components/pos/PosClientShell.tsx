@@ -5,9 +5,9 @@ import { Product } from '@/types';
 import { formatPrice } from '@/lib/api';
 import { buildOrderSyncPayload } from '@/lib/posPayload';
 import {
-  saveOfflineOrderToDexie,
   getPendingOfflineOrdersCount,
   syncOfflineOrdersFromDexie,
+  saveOrderLocallyToDexie,
 } from '@/lib/offlineQueue';
 import PosHeader from './PosHeader';
 import PosCategorySidebar from './PosCategorySidebar';
@@ -16,11 +16,12 @@ import PosTicketSidebar from './PosTicketSidebar';
 import PosModals from './PosModals';
 
 
-interface PosCartItem {
+export interface PosCartItem {
   product: Product;
   quantity: number;
+  notes?: string[];     // 🚀 Fixes Property 'notes' does not exist error!
+  extraPrice?: number;  // 🚀 Fixes Property 'extraPrice' does not exist error!
 }
-
 interface PosClientShellProps {
   initialProducts: Product[];
   cashierName: string;
@@ -47,7 +48,7 @@ export default function PosClientShell({
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway'>('dine_in');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'split'>('card');
   const [cashGiven, setCashGiven] = useState<string>('');
-  
+
   // 🚀 SPLIT PAYMENT STATE
   const [splitCashAmount, setSplitCashAmount] = useState<string>('');
 
@@ -126,27 +127,61 @@ export default function PosClientShell({
     return matchesSearch && matchesCategory;
   });
 
-  const addToCart = (product: Product) => {
+  // 🚀 ADD WITH NOTES & EXTRAS
+  const addToCartWithNotes = (
+    product: Product,
+    notes: string[] = [],
+    extraPrice: number = 0
+  ) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      const notesKey = notes.sort().join('|');
+
+      const existingIndex = prev.findIndex(
+        (item) =>
+          item.product.id === product.id &&
+          (item.notes || []).sort().join('|') === notesKey
+      );
+
+      if (existingIndex > -1) {
+        return prev.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+
+      return [
+        ...prev,
+        {
+          product,
+          quantity: 1,
+          notes,
+          extraPrice,
+        },
+      ];
     });
   };
 
-  const removeFromCart = (productId: number) => {
+  // 🚀 REMOVE BY PRODUCT ID AND NOTES KEY
+  const removeFromCartWithNotes = (product: Product, notes: string[] = []) => {
+    const notesKey = notes.sort().join('|');
+
     setCart((prev) =>
       prev
-        .map((item) =>
-          item.product.id === productId ? { ...item, quantity: item.quantity - 1 } : item
-        )
+        .map((item) => {
+          if (
+            item.product.id === product.id &&
+            (item.notes || []).sort().join('|') === notesKey
+          ) {
+            return { ...item, quantity: item.quantity - 1 };
+          }
+          return item;
+        })
         .filter((item) => item.quantity > 0)
     );
   };
+
+
 
   const clearCart = () => {
     setCart([]);
@@ -200,52 +235,79 @@ export default function PosClientShell({
   };
 
   // 🚀 CHARGE ORDER WITH SPLIT PAYMENT SUPPORT
+  // 🚀 CLEANED UP: 100% Dynamic Per-Product TVA Calculation!
   const handleChargeOrder = async () => {
     if (cart.length === 0) return;
     setIsSubmitting(true);
 
-    const cashGivenNum = parseFloat(cashGiven) || 0;
-    const changeDue = Math.max(0, cashGivenNum - totalAmount);
+    let subtotalHtSum = 0;
+    let vatSum = 0;
 
+    // Calculate HT and TVA dynamically per product
+    cart.forEach((item) => {
+      const unitPrice = parseFloat(
+        formatPrice(item.product.price || (item.product as any).unit_price)
+      );
+
+      // Read dynamic TVA set in tyro-dashboard (5.5, 10, or 20)
+      const itemVatRate = parseFloat(
+        String(
+          item.product.vat_rate ||
+          (item.product as any).vat_rate ||
+          (item.product as any).tva ||
+          '10.00'
+        )
+      );
+
+      const lineTotalTtc = unitPrice * item.quantity;
+      const lineSubtotalHt = lineTotalTtc / (1 + itemVatRate / 100);
+      const lineVatAmount = lineTotalTtc - lineSubtotalHt;
+
+      subtotalHtSum += lineSubtotalHt;
+      vatSum += lineVatAmount;
+    });
+
+    const orderUuid = self.crypto.randomUUID();
     const splitCashNum = parseFloat(splitCashAmount) || 0;
     const splitCardNum = Math.max(0, totalAmount - splitCashNum);
+    // Calculate change due when paying with cash
+    const changeDue = Math.max(0, (parseFloat(cashGiven) || 0) - totalAmount);
 
-    const payload = buildOrderSyncPayload(
-      cart,
-      paymentMethod,
-      orderType,
-      customerName,
-      customerPhone,
-      paymentMethod === 'split'
-        ? { cashAmount: splitCashNum, cardAmount: splitCardNum }
-        : undefined
-    );
-
-
-
-    // 🚀 Snapshot includes exact Cash & Card split amounts for receipt printing!
     const orderReceiptSnapshot = {
       items: [...cart],
       customerName: customerName || 'Walk-in Customer',
       customerPhone: customerPhone || null,
       orderType,
       paymentMethod,
-      cashGiven: paymentMethod === 'cash' ? cashGivenNum : 0,
+      cashGiven: paymentMethod === 'cash' ? cashGiven : 0,
       changeDue: paymentMethod === 'cash' ? changeDue : 0,
-      splitCashAmount: paymentMethod === 'split' ? splitCashNum : 0, // 👈 Added
-      splitCardAmount: paymentMethod === 'split' ? splitCardNum : 0, // 👈 Added
+      splitCashAmount: paymentMethod === 'split' ? splitCashNum : 0,
+      splitCardAmount: paymentMethod === 'split' ? splitCardNum : 0,
       totalAmount,
       createdAt: new Date().toLocaleTimeString('fr-FR'),
     };
 
+    // 🚀 OFFLINE BRANCH (Saves to Dexie.js IndexedDB with dynamic TVA)
     if (!navigator.onLine) {
-      const offlineRecord = await saveOfflineOrderToDexie(payload);
+      const seqNum = await saveOrderLocallyToDexie(
+        orderUuid,
+        parseFloat(subtotalHtSum.toFixed(2)),
+        parseFloat(vatSum.toFixed(2)),
+        parseFloat(totalAmount.toFixed(2)),
+        cart,
+        paymentMethod,
+        orderType,
+        customerName,
+        customerPhone,
+        paymentMethod === 'split' ? { cashAmount: splitCashNum, cardAmount: splitCardNum } : undefined
+      );
+
       await updatePendingCount();
 
       setCompletedOrder({
         ...orderReceiptSnapshot,
-        id: offlineRecord.localUuid,
-        sequence_number: 'LOCAL-DEXIE',
+        id: orderUuid,
+        sequence_number: `#${seqNum} (LOCAL)`,
         isOffline: true,
       });
 
@@ -254,7 +316,17 @@ export default function PosClientShell({
       return;
     }
 
+    // 🚀 ONLINE BRANCH (Sends dynamic TVA payload to Laravel OrderSyncController)
     try {
+      const payload = buildOrderSyncPayload(
+        cart,
+        paymentMethod,
+        orderType,
+        customerName,
+        customerPhone,
+        paymentMethod === 'split' ? { cashAmount: splitCashNum, cardAmount: splitCardNum } : undefined
+      );
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/orders/sync`,
         {
@@ -271,38 +343,42 @@ export default function PosClientShell({
       const data = await res.json();
 
       if (res.ok) {
-        const serverOrder = data.orders?.find(
-          (o: any) => o.uuid === payload.orders[0].uuid
-        ) || data.orders?.[0];
-
+        const serverOrder = data.orders?.[0];
         setCompletedOrder({
           ...orderReceiptSnapshot,
-          id: serverOrder?.id || serverOrder?.uuid || 'SYNCED',
-          sequence_number: serverOrder?.sequence_number || 'POS-1',
+          id: serverOrder?.id || orderUuid,
+          sequence_number: serverOrder?.sequence_number || 'POS',
           isOffline: false,
         });
-
         clearCart();
       } else {
-        await saveOfflineOrderToDexie(payload);
+        await saveOrderLocallyToDexie(
+          orderUuid,
+          parseFloat(subtotalHtSum.toFixed(2)),
+          parseFloat(vatSum.toFixed(2)),
+          parseFloat(totalAmount.toFixed(2)),
+          cart,
+          paymentMethod,
+          orderType,
+          customerName,
+          customerPhone
+        );
         await updatePendingCount();
-        setCompletedOrder({
-          ...orderReceiptSnapshot,
-          id: 'DEXIE-SAVED',
-          sequence_number: 'LOCAL-DEXIE',
-          isOffline: true,
-        });
         clearCart();
       }
     } catch (err) {
-      const offlineRecord = await saveOfflineOrderToDexie(payload);
+      await saveOrderLocallyToDexie(
+        orderUuid,
+        parseFloat(subtotalHtSum.toFixed(2)),
+        parseFloat(vatSum.toFixed(2)),
+        parseFloat(totalAmount.toFixed(2)),
+        cart,
+        paymentMethod,
+        orderType,
+        customerName,
+        customerPhone
+      );
       await updatePendingCount();
-      setCompletedOrder({
-        ...orderReceiptSnapshot,
-        id: offlineRecord.localUuid,
-        sequence_number: 'LOCAL-DEXIE',
-        isOffline: true,
-      });
       clearCart();
     } finally {
       setIsSubmitting(false);
@@ -329,13 +405,13 @@ export default function PosClientShell({
           onSelectCategory={setSelectedCategory}
         />
 
+
         <PosProductGrid
           products={filteredProducts}
           search={search}
           onSearchChange={setSearch}
-          onAddToCart={addToCart}
+          onAddToCart={addToCartWithNotes} // 👈 Pass function here!
         />
-
         {/* 🚀 FIXED: Passes splitCashAmount and onSetSplitCashAmount to Sidebar! */}
         <PosTicketSidebar
           cart={cart}
@@ -352,12 +428,13 @@ export default function PosClientShell({
           onSetSplitCashAmount={setSplitCashAmount}
           onSetCustomerName={setCustomerName}
           onSetCustomerPhone={setCustomerPhone}
-          onAddToCart={addToCart}
-          onRemoveFromCart={removeFromCart}
+          onAddToCart={addToCartWithNotes}
+          onRemoveFromCart={removeFromCartWithNotes} // 👈 Pass accurate remove function!
           onClearCart={clearCart}
           onChargeOrder={handleChargeOrder}
         />
       </div>
+
 
       <PosModals
         completedOrder={completedOrder}
@@ -366,6 +443,7 @@ export default function PosClientShell({
         salesHistory={salesHistory}
         loadingHistory={loadingHistory}
         cashierName={cashierName}
+        accessToken={accessToken} // 🚀 Pass accessToken here
         onCloseCompletedModal={() => setCompletedOrder(null)}
         onCloseSalesHistoryModal={() => setShowSalesHistoryModal(false)}
         onCloseZClosureModal={() => setShowZClosureModal(false)}
