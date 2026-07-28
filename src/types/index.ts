@@ -5,6 +5,7 @@ export interface Product {
   price?: any;
   unit_price?: any;
   amount?: any;
+  vat_rate?: number | string; // 🚀 Dynamic TVA (5.50, 10.00, 20.00) from Laravel DB
   image: string | null;
   is_active?: boolean;
   category_id?: number;

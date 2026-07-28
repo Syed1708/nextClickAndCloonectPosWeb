@@ -1,8 +1,5 @@
 import { db, PosOfflineOrder } from './db';
 
-/**
- * Saves a POS order directly into IndexedDB (Dexie.js)
- */
 export async function saveOfflineOrderToDexie(payload: any): Promise<PosOfflineOrder> {
   const localUuid = `OFFLINE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -17,17 +14,11 @@ export async function saveOfflineOrderToDexie(payload: any): Promise<PosOfflineO
   return { ...record, id: Number(id) };
 }
 
-/**
- * Gets count of unsynced offline orders in IndexedDB
- */
 export async function getPendingOfflineOrdersCount(): Promise<number> {
+  if (typeof window === 'undefined') return 0;
   return await db.offlineOrders.where('status').equals('pending').count();
 }
 
-/**
- * Silent Background Auto-Sync Engine:
- * Pulls pending tickets from IndexedDB and posts them to Laravel /api/orders/sync
- */
 export async function syncOfflineOrdersFromDexie(
   accessToken: string | null
 ): Promise<{ synced: number; failed: number }> {
@@ -41,10 +32,11 @@ export async function syncOfflineOrdersFromDexie(
 
   for (const item of pendingOrders) {
     try {
-      // Mark status as syncing
       if (item.id) {
         await db.offlineOrders.update(item.id, { status: 'syncing' });
       }
+
+      console.log('🚀 [Dexie Syncing Payload]:', item.payload);
 
       const res = await fetch(`${API_URL}/api/orders/sync`, {
         method: 'POST',
@@ -56,26 +48,30 @@ export async function syncOfflineOrdersFromDexie(
         body: JSON.stringify(item.payload),
       });
 
+      const resData = await res.json().catch(() => null);
+
       if (res.ok) {
-        // Remove successfully synced order from IndexedDB
+        console.log('✅ [Dexie Sync Success]:', item.localUuid, resData);
         if (item.id) {
           await db.offlineOrders.delete(item.id);
         }
         syncedCount++;
       } else {
-        // Revert status to pending on API failure
+        // 🚀 PRINT EXACT LARAVEL REJECTION REASON IN CONSOLE!
+        console.error(`❌ [Laravel Rejected Sync - HTTP ${res.status}]:`, resData);
+
         if (item.id) {
           await db.offlineOrders.update(item.id, { status: 'pending' });
         }
         failedCount++;
       }
     } catch (err) {
-      console.error('Dexie sync error for item', item.localUuid, err);
+      console.error('❌ [Network Error during Dexie Sync]:', err);
       if (item.id) {
         await db.offlineOrders.update(item.id, { status: 'pending' });
       }
       failedCount++;
-      break; // Stop loop if network is unreachable
+      break;
     }
   }
 
