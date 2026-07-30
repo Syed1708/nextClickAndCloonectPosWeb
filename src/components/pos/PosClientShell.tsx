@@ -215,22 +215,50 @@ export default function PosClientShell({
     }
   };
 
+// 🚀 HARDENED WEB REFUND HANDLER
   const handleRefundOrder = async (orderId: number) => {
-    if (!confirm('Refund this order?')) return;
+    // 1. Pre-check if order is already refunded in state
+    const targetOrder = salesHistory.find((o) => o.id === orderId);
+
+    if (targetOrder) {
+      const isAlreadyRefunded =
+        targetOrder.status === 'refunded' ||
+        targetOrder.preparation_status === 'cancelled' ||
+        targetOrder.order_type === 'refund' ||
+        (targetOrder.customer_name && targetOrder.customer_name.includes('AVOIR')) ||
+        Number(targetOrder.total_incl_vat || targetOrder.total_amount) < 0;
+
+      if (isAlreadyRefunded) {
+        alert('Cette commande a déjà fait l\'objet d\'un remboursement ou d\'un avoir.');
+        return;
+      }
+    }
+
+    if (!confirm('Voulez-vous vraiment rembourser cette commande ?')) return;
+
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/pos/refund/${orderId}`,
         {
           method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
         }
       );
+
+      const data = await res.json();
+
       if (res.ok) {
-        alert('Order refunded!');
-        fetchSalesHistory();
+        alert(data.message || 'Commande remboursée avec succès !');
+        fetchSalesHistory(); // 🚀 Refresh sales history from server
+      } else {
+        alert(data.message || data.error || 'Échec du remboursement');
       }
     } catch (e) {
-      console.error(e);
+      console.error('Refund Exception:', e);
+      alert('Erreur lors du traitement du remboursement');
     }
   };
 

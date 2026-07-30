@@ -66,7 +66,7 @@ export default function PosModals({
   const [expandedOrderId, setExpandedOrderId] = useState<number | string | null>(null);
   const [reprintOrder, setReprintOrder] = useState<any | null>(null);
 
-// 🚀 PRINT HANDLERS WITH RENDER TIMEOUT
+  // 🚀 PRINT HANDLERS WITH RENDER TIMEOUT
   const handlePrintOrderReceipt = (orderData: any) => {
     setPrintZReport(null);
     setReprintOrder(orderData);
@@ -219,7 +219,7 @@ export default function PosModals({
 
   return (
     <>
-      
+
       {/* 🚀 REMOVED Tailwind 'hidden print:block' -> globals.css handles this now! */}
       <PrintPortal>
         {reprintOrder || completedOrder ? (
@@ -321,11 +321,10 @@ export default function PosModals({
                   <button
                     key={chip.key}
                     onClick={() => setStatusFilter(chip.key as any)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      statusFilter === chip.key
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${statusFilter === chip.key
                         ? 'bg-amber-500 text-zinc-950'
                         : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-white'
-                    }`}
+                      }`}
                   >
                     {chip.label}
                   </button>
@@ -333,6 +332,7 @@ export default function PosModals({
               </div>
             </div>
 
+{/* Sales List Container */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {loadingHistory ? (
                 <div className="flex justify-center py-12 text-zinc-500">
@@ -344,10 +344,15 @@ export default function PosModals({
                 filteredSales.map((item: any) => {
                   const isRefunded =
                     item.status === 'refunded' || item.preparation_status === 'cancelled';
+                  
                   const isAvoirCreditNote =
                     item.order_type === 'refund' ||
                     (item.customer_name && item.customer_name.includes('AVOIR')) ||
                     Number(item.total_incl_vat || item.total_amount) < 0;
+
+                  // 🚀 HARDENED DISABLE CHECK
+                  const cannotRefund =
+                    isRefunded || isAvoirCreditNote || item.preparation_status === 'cancelled';
 
                   const isLocal = item.isOffline || item.is_synced === 0;
                   const isExpanded = expandedOrderId === item.id;
@@ -364,6 +369,7 @@ export default function PosModals({
                           : 'bg-zinc-950 border-zinc-800'
                       }`}
                     >
+                      {/* Top Summary Row */}
                       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
@@ -371,13 +377,14 @@ export default function PosModals({
                               Ticket #{item.sequence_number || item.id}
                             </span>
 
+                            {/* 🚀 BADGES: AVOIR vs ANNULÉ/REMBOURSÉ vs PAYÉ */}
                             {isAvoirCreditNote ? (
                               <span className="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                                 AVOIR / CREDIT NOTE
                               </span>
                             ) : isRefunded ? (
-                              <span className="bg-zinc-800 text-red-400 border border-red-500/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                                REMBOURSÉ
+                              <span className="bg-red-500/10 text-red-400 border border-red-500/30 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                ANNULÉ / REMBOURSÉ
                               </span>
                             ) : (
                               <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
@@ -385,6 +392,7 @@ export default function PosModals({
                               </span>
                             )}
 
+                            {/* SYNC BADGE */}
                             {isLocal ? (
                               <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                                 <WifiOff className="w-3 h-3" /> Local (IndexedDB)
@@ -402,6 +410,7 @@ export default function PosModals({
                           </p>
                         </div>
 
+                        {/* Amount & Refund Button */}
                         <div className="flex items-center gap-3">
                           <span
                             className={`font-black text-base ${
@@ -422,21 +431,23 @@ export default function PosModals({
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                           </button>
 
+                          {/* 🚀 REFUND BUTTON: PERMANENTLY DISABLED IF REFUNDED OR AVOIR */}
                           <button
-                            disabled={isRefunded || isAvoirCreditNote}
+                            disabled={cannotRefund}
                             onClick={() => onRefundOrder(item.id)}
                             className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition ${
-                              isRefunded || isAvoirCreditNote
+                              cannotRefund
                                 ? 'bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800'
                                 : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30'
                             }`}
                           >
                             <Undo2 className="w-3.5 h-3.5" />
-                            <span>{isAvoirCreditNote ? 'Avoir' : isRefunded ? 'Remboursé' : 'Refund'}</span>
+                            <span>{isAvoirCreditNote ? 'Avoir' : cannotRefund ? 'Remboursé' : 'Refund'}</span>
                           </button>
                         </div>
                       </div>
 
+                      {/* Expanded Details */}
                       {isExpanded && (
                         <div className="pt-3 border-t border-zinc-800/80 space-y-3 bg-zinc-900/50 p-3 rounded-xl text-xs">
                           <div className="space-y-1">
@@ -455,7 +466,10 @@ export default function PosModals({
 
                           <div className="pt-2 border-t border-zinc-800 flex justify-between items-center">
                             <button
-                              onClick={() => handlePrintOrderReceipt(item)}
+                              onClick={() => {
+                                setReprintOrder(item);
+                                setTimeout(() => window.print(), 100);
+                              }}
                               className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
                             >
                               <Printer className="w-3.5 h-3.5 text-amber-500" /> Re-print Receipt
@@ -471,6 +485,8 @@ export default function PosModals({
                 })
               )}
             </div>
+
+
           </div>
         </div>
       )}
@@ -491,17 +507,15 @@ export default function PosModals({
             <div className="flex bg-zinc-950 border border-zinc-800 p-1 rounded-2xl gap-1">
               <button
                 onClick={() => setZTab('close')}
-                className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition ${
-                  zTab === 'close' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400'
-                }`}
+                className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition ${zTab === 'close' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400'
+                  }`}
               >
                 Close Current Shift
               </button>
               <button
                 onClick={() => setZTab('history')}
-                className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition ${
-                  zTab === 'history' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400'
-                }`}
+                className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition ${zTab === 'history' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400'
+                  }`}
               >
                 Z-Report History Archive
               </button>
