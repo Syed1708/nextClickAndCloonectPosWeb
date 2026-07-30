@@ -16,18 +16,13 @@ export const getEcho = (): Echo<any> => {
   if (!echoInstance) {
     window.Pusher = Pusher;
 
-    const appKey = process.env.NEXT_PUBLIC_REVERB_APP_KEY || '';
-    const host = process.env.NEXT_PUBLIC_REVERB_HOST || 'ws-eu.pusher.com';
-    const isPusherCloud = host.includes('pusher.com');
-
     echoInstance = new Echo({
-      broadcaster: isPusherCloud ? 'pusher' : 'reverb',
-      key: appKey,
-      wsHost: host,
-      wsPort: 443,
-      wssPort: 443,
-      forceTLS: true,
-      cluster: isPusherCloud ? host.split('.')[0].replace('ws-', '') : undefined,
+      broadcaster: 'reverb',
+      key: process.env.NEXT_PUBLIC_REVERB_APP_KEY || 'reverb_key',
+      wsHost: process.env.NEXT_PUBLIC_REVERB_HOST || '127.0.0.1',
+      wsPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT) || 8080,
+      wssPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT) || 8080,
+      forceTLS: (process.env.NEXT_PUBLIC_REVERB_SCHEME ?? 'https') === 'https',
       enabledTransports: ['ws', 'wss'],
     });
   }
