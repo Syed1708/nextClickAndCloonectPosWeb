@@ -55,6 +55,10 @@ export default function PosModals({
   const [actualCash, setActualCash] = useState<string>('');
   const [isClosing, setIsClosing] = useState(false);
 
+  // 🚀 Z-CLOSURE SHIFT SUMMARY STATE
+  const [shiftSummary, setShiftSummary] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
   // Z-Closure History State
   const [zClosureHistory, setZClosureHistory] = useState<any[]>([]);
   const [loadingZHistory, setLoadingZHistory] = useState(false);
@@ -87,35 +91,18 @@ export default function PosModals({
   };
 
   // 🚀 REACT 19 SAFE EFFECT FOR Z-REPORT HISTORY (No synchronous setState warnings)
+
+ // Fetch Live Shift Summary when Z-Closure Modal opens
   useEffect(() => {
     let isMounted = true;
 
-    if (showZClosureModal && zTab === 'history') {
-      const loadZHistory = async () => {
-        setLoadingZHistory(true);
-        let combinedHistory: any[] = [];
-
+    if (showZClosureModal && zTab === 'close') {
+      const fetchSummary = async () => {
+        setLoadingSummary(true);
         try {
-          if (typeof window !== 'undefined') {
-            const localZ = await db.dailyClosures.toArray();
-            combinedHistory = localZ.map((z) => ({
-              ...z,
-              isOffline: true,
-              z_number: z.z_number,
-              total_ttc: z.total_ttc,
-              total_ht: z.total_ht,
-              total_tva: z.total_tva,
-              closed_at: z.closed_at,
-            }));
-          }
-        } catch (err) {
-          console.error('Failed to read Dexie Z-reports:', err);
-        }
-
-        if (navigator.onLine) {
-          try {
+          if (navigator.onLine) {
             const res = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/pos/z-closure/history`,
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/pos/z-closure/summary`,
               {
                 headers: {
                   Authorization: `Bearer ${accessToken}`,
@@ -123,29 +110,19 @@ export default function PosModals({
                 },
               }
             );
-
             if (res.ok) {
               const data = await res.json();
-              const serverZ = data.data || data;
-              const serverZArray = Array.isArray(serverZ) ? serverZ : [];
-              combinedHistory = [...serverZArray, ...combinedHistory];
+              if (isMounted) setShiftSummary(data);
             }
-          } catch (e) {
-            console.error('Failed to fetch server Z-history:', e);
           }
-        }
-
-        combinedHistory.sort(
-          (a, b) => (b.z_number || b.zNumber || 0) - (a.z_number || a.zNumber || 0)
-        );
-
-        if (isMounted) {
-          setZClosureHistory(combinedHistory);
-          setLoadingZHistory(false);
+        } catch (e) {
+          console.error('Failed to fetch shift summary:', e);
+        } finally {
+          if (isMounted) setLoadingSummary(false);
         }
       };
 
-      loadZHistory();
+      fetchSummary();
     }
 
     return () => {
@@ -521,51 +498,80 @@ export default function PosModals({
               </button>
             </div>
 
-            {zTab === 'close' && (
-              <div className="space-y-4 text-center py-2">
-                <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto">
-                  <DollarSign className="w-6 h-6" />
-                </div>
+{/* TAB 1: CLOSE ACTIVE SHIFT */}
+          {zTab === 'close' && (
+            <div className="space-y-4 text-center py-2">
+              <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto">
+                <DollarSign className="w-6 h-6" />
+              </div>
 
-                <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-2xl space-y-3 text-xs text-left">
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Cashier Staff:</span>
-                    <span className="font-bold text-white">{cashierName}</span>
+              {/* 🚀 LIVE SHIFT SUMMARY PREVIEW */}
+              <div className="bg-zinc-950 border border-zinc-800 p-4 rounded-2xl space-y-2.5 text-xs text-left">
+                {loadingSummary ? (
+                  <div className="flex justify-center py-4 text-zinc-500">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading shift stats...
                   </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Shift Date:</span>
-                    <span className="font-bold text-white">{new Date().toLocaleDateString('fr-FR')}</span>
-                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center text-zinc-400 border-b border-zinc-800/80 pb-2">
+                      <span>Tickets à figer:</span>
+                      <span className="font-extrabold text-amber-400 text-sm">
+                        {shiftSummary?.open_orders_count ?? 0} Ticket(s)
+                      </span>
+                    </div>
 
-                  <div className="pt-2 border-t border-zinc-800">
-                    <label className="block text-[11px] font-bold text-zinc-400 mb-1">
-                      Actual Cash in Drawer (€):
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 150.00"
-                      value={actualCash}
-                      onChange={(e) => setActualCash(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-amber-400 font-bold focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
+                    <div className="flex justify-between text-zinc-400">
+                      <span>CA Total TTC (Attendu):</span>
+                      <span className="font-extrabold text-white text-sm">
+                        €{Number(shiftSummary?.total_revenue || shiftSummary?.total_ttc || 0).toFixed(2)}
+                      </span>
+                    </div>
 
-                <div className="flex gap-3 pt-2">
-                  <button onClick={onCloseZClosureModal} className="flex-1 bg-zinc-800 text-zinc-400 font-bold py-3 rounded-xl text-xs">
-                    Cancel
-                  </button>
-                  <button
-                    disabled={isClosing}
-                    onClick={handleConfirmZClosure}
-                    className="flex-1 bg-emerald-500 text-zinc-950 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2"
-                  >
-                    {isClosing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Close Register & Freeze'}
-                  </button>
+                    <div className="flex justify-between text-zinc-400 text-[11px] pl-2">
+                      <span>• Espèces attendues:</span>
+                      <span className="font-bold text-white">
+                        €{Number(shiftSummary?.cash_sales || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-zinc-400 text-[11px] pl-2">
+                      <span>• Carte CB attendue:</span>
+                      <span className="font-bold text-white">
+                        €{Number(shiftSummary?.card_sales || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Actual Physical Cash Input */}
+                <div className="pt-2 border-t border-zinc-800">
+                  <label className="block text-[11px] font-bold text-zinc-400 mb-1">
+                    Actual Cash in Drawer (€):
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 150.00"
+                    value={actualCash}
+                    onChange={(e) => setActualCash(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-amber-400 font-bold focus:outline-none focus:border-amber-500"
+                  />
                 </div>
               </div>
-            )}
 
+              <div className="flex gap-3 pt-2">
+                <button onClick={onCloseZClosureModal} className="flex-1 bg-zinc-800 text-zinc-400 font-bold py-3 rounded-xl text-xs">
+                  Cancel
+                </button>
+                <button
+                  disabled={isClosing || (shiftSummary?.open_orders_count === 0 && navigator.onLine)}
+                  onClick={handleConfirmZClosure}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition"
+                >
+                  {isClosing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Close Register & Freeze'}
+                </button>
+              </div>
+            </div>
+          )}
             {zTab === 'history' && (
               <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[50vh]">
                 {loadingZHistory ? (
