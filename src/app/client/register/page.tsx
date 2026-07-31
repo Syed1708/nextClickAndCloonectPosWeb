@@ -39,10 +39,10 @@ export default function RegisterPage() {
       });
 
       if (result?.ok) {
-        router.push('/profile');
+        router.push('/client/profile');
         router.refresh();
       } else {
-        router.push('/login');
+        router.push('/client/login');
       }
     } catch (err: any) {
       setError(err.message || 'Registration failed.');
