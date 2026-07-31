@@ -13,11 +13,13 @@ export interface Product {
 }
 
 export interface ClientProfile {
-  id: number;
-  name: string;
-  email: string;
+  id?: number | string; // 🚀 FIX: Accepts both string (NextAuth) and number (Laravel DB)
+  name?: string | null;
+  email?: string | null;
   phone?: string | null;
   address?: string | null;
+  userType?: 'client' | 'staff';
+  role?: string;
 }
 
 export interface OrderItem {

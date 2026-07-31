@@ -23,7 +23,7 @@ import { ClientProfile, Order } from '../types';
 
 interface ClientDashboardShellProps {
   session: Session | null;
-  clientProfile: ClientProfile | null;
+  clientProfile: ClientProfile | any | null; // 🚀 FIX: Allows NextAuth user object or Laravel profile
   initialOrders: Order[];
 }
 export default function ClientDashboardShell({
