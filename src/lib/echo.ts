@@ -16,19 +16,11 @@ export const getEcho = (): Echo<any> => {
   if (!echoInstance) {
     window.Pusher = Pusher;
 
-    const appKey = process.env.NEXT_PUBLIC_REVERB_APP_KEY || '';
-    const host = process.env.NEXT_PUBLIC_REVERB_HOST || 'ws-eu.pusher.com';
-    const isPusherCloud = host.includes('pusher.com');
-
     echoInstance = new Echo({
-      broadcaster: isPusherCloud ? 'pusher' : 'reverb',
-      key: appKey,
-      wsHost: host,
-      wsPort: 443,
-      wssPort: 443,
+      broadcaster: 'pusher',
+      key: process.env.NEXT_PUBLIC_REVERB_APP_KEY || '1f66536d3d7bb2ec0eec',
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu',
       forceTLS: true,
-      cluster: isPusherCloud ? host.split('.')[0].replace('ws-', '') : undefined,
-      enabledTransports: ['ws', 'wss'],
     });
   }
 
