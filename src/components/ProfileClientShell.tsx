@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Session } from 'next-auth';
@@ -45,14 +45,39 @@ export default function ClientDashboardShell({
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Filter active orders
-  const activeOrders = orders.filter(
-    (o) =>
-      o.preparation_status !== 'delivered' &&
-      o.preparation_status !== 'completed' &&
-      o.status !== 'completed' &&
-      o.status !== 'delivered'
-  );
+    // 🚀 FAIL-SAFE: Verifies Stripe payment on page load if arriving from checkout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const sessionId = urlParams.get('session_id');
+
+    if (status === 'success' && sessionId) {
+      const verifyAndCreateOrder = async () => {
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/checkout/verify-session?session_id=${sessionId}`
+          );
+          if (res.ok) {
+            router.refresh();
+          }
+        } catch (err) {
+          console.error('Session verification error:', err);
+        }
+      };
+
+      verifyAndCreateOrder();
+    }
+  }, [router]);
+
+  // 🚀 FIX: Filters active orders using preparation_status!
+  const activeOrders = orders.filter((o) => {
+    const prepStatus = o.preparation_status || 'pending';
+    return prepStatus !== 'delivered' && prepStatus !== 'cancelled';
+  });
+
+  
 
   const handleSaveProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
