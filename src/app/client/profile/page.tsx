@@ -3,7 +3,10 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 import ClientDashboardShell from '@/components/ProfileClientShell';
 
-export default async function ProfileSSRPage() {
+export default async function ProfileSSRPage({searchParams,}: {
+  searchParams: { status?: string; session_id?: string };
+}) {
+
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -13,6 +16,18 @@ export default async function ProfileSSRPage() {
   const token = (session as any).accessToken;
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
+    // 🚀 FAIL-SAFE: If arriving from Stripe checkout, verify session & create order!
+  if (searchParams?.status === 'success' && searchParams?.session_id) {
+    try {
+      await fetch(
+        `${API_URL}/api/checkout/verify-session?session_id=${searchParams.session_id}`,
+        { cache: 'no-store' }
+      );
+    } catch (e) {
+      console.error('Session verification failed:', e);
+    }
+  }
+  
   // 1. 🚀 Fetch FRESH Client Profile from MySQL on every page load (bypasses cookie!)
   let clientProfile = session.user;
   try {
