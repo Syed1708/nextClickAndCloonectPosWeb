@@ -35,10 +35,11 @@ export default function ItemModifierModal({
   onClose,
   onConfirm,
 }: ItemModifierModalProps) {
+    const [selectedNotes, setSelectedNotes] = useState<string[]>(initialNotes);
+  const [customNote, setCustomNote] = useState('');
   if (!product) return null;
 
-  const [selectedNotes, setSelectedNotes] = useState<string[]>(initialNotes);
-  const [customNote, setCustomNote] = useState('');
+
 
   const toggleNote = (noteLabel: string) => {
     if (selectedNotes.includes(noteLabel)) {
