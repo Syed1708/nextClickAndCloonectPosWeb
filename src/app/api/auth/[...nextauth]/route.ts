@@ -130,9 +130,12 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
+  // 🚀 FIX: Map fallback pages so NextAuth redirects to /client/login instead of /login
   pages: {
-    signIn: '/login',
+    signIn: '/client/login',
+    error: '/client/login',
   },
+
   session: {
     strategy: 'jwt',
   },

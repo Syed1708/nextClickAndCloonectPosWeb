@@ -9,8 +9,8 @@ export async function proxy(req: NextRequest) {
 
   const userType = (token as any)?.userType; // 'staff' or 'client'
 
-  // 🚀 RULE 1: IF ALREADY LOGGED IN -> Block access to Login Pages!
-  if (token && (pathname === '/client/login' || pathname === '/pos/login')) {
+  // 🚀 RULE 1: IF ALREADY LOGGED IN -> Block access to Login & Register Pages!
+  if (token && (pathname === '/client/login' || pathname === '/pos/login' || pathname === '/client/register')) {
     if (userType === 'staff') {
       return NextResponse.redirect(new URL('/pos', req.url));
     } else {
@@ -30,19 +30,21 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // 🚀 RULE 3: PROTECT /profile (Only Clients Allowed)
+  // 🚀 RULE 3: PROTECT /client/profile (Only Clients Allowed)
   if (pathname.startsWith('/client/profile')) {
     // If guest -> Redirect to Customer Login
     if (!token) {
-      return NextResponse.redirect(new URL('/client/login', req.url));
+      const loginUrl = new URL('/client/login', req.url);
+      loginUrl.searchParams.set('callbackUrl', req.url);
+      return NextResponse.redirect(loginUrl);
     }
-    // If logged in as Staff -> Redirect to POS Register
+    // If logged in as Staff -> Redirect to POS
     if (userType === 'staff') {
       return NextResponse.redirect(new URL('/pos', req.url));
     }
   }
-  // 🚀 RULE 4: PROTECT /orders (Only Clients Allowed)
-    // 🚀 RULE 4: PROTECT /order (BLOCK STAFF FROM ONLINE CUSTOMER ORDER PAGE)
+
+  // 🚀 RULE 4: PROTECT /order (BLOCK STAFF FROM ONLINE CUSTOMER ORDER PAGE)
   if (pathname.startsWith('/order')) {
     if (token && userType === 'staff') {
       return NextResponse.redirect(new URL('/pos', req.url));
@@ -54,5 +56,12 @@ export async function proxy(req: NextRequest) {
 
 // Specify which routes are intercepted by middleware
 export const config = {
-  matcher: ['/client/login', '/pos/login', '/pos/:path*', '/client/profile/:path*', '/order/:path*'],
+  matcher: [
+    '/client/login',
+    '/client/register',
+    '/pos/login',
+    '/pos/:path*',
+    '/client/profile/:path*',
+    '/order/:path*'
+  ],
 };

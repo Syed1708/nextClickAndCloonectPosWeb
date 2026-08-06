@@ -42,3 +42,10 @@ export interface Order {
   created_at: string;
   items?: OrderItem[];
 }
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  notes?: string[];
+  extraPrice?: number; // Stores extra cost from paid suppléments (+€1.50 Bacon, etc.)
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,14 @@ import {
 } from 'lucide-react';
 import { Product } from '../types';
 import { getImageUrl, formatPrice } from '../lib/api';
+import ItemModifierModal from '../components/client/ItemModifierModal'; // 🚀 Import Item Modifier Modal
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  notes?: string[];
+  extraPrice?: number;
+}
 
 interface OrderClientShellProps {
   initialProducts: Product[];
@@ -33,10 +41,38 @@ export default function OrderClientShell({
   const router = useRouter();
 
   const [products] = useState<Product[]>(initialProducts);
-  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [visibleCount, setVisibleCount] = useState(10);
+
+  // Active product selected for modifier modal
+  const [selectedProductForModifier, setSelectedProductForModifier] = useState<Product | null>(null);
+
+  // 🚀 Store Opening Hours State
+  const [storeStatus, setStoreStatus] = useState<{ is_open: boolean; schedule: string }>({
+    is_open: true,
+    schedule: '10:00 - 14:30 & 18:30 - 06:30',
+  });
+
+  useEffect(() => {
+    // Fetch live opening status from Laravel
+    async function checkStoreStatus() {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/store-status`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setStoreStatus(data);
+          console.log('Store status fetched:', data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch store status:', e);
+      }
+    }
+    checkStoreStatus();
+  }, []);
 
   // Modals state
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -57,31 +93,50 @@ export default function OrderClientShell({
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
-  const addToCart = (product: Product) => {
+  // 🚀 Add to Cart with Custom Notes & Paid Extras
+  const addToCartWithNotes = (
+    product: Product,
+    notes: string[] = [],
+    extraPrice: number = 0
+  ) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      const notesKey = notes.sort().join('|');
+
+      const existingIndex = prev.findIndex(
+        (item) =>
+          item.product.id === product.id &&
+          (item.notes || []).sort().join('|') === notesKey
+      );
+
+      if (existingIndex > -1) {
+        return prev.map((item, idx) =>
+          idx === existingIndex ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+
+      return [...prev, { product, quantity: 1, notes, extraPrice }];
     });
   };
 
-  const removeFromCart = (productId: number) => {
+  // Quantity Management by Index
+  const updateCartQuantity = (index: number, delta: number) => {
     setCart((prev) =>
       prev
-        .map((item) =>
-          item.product.id === productId ? { ...item, quantity: item.quantity - 1 } : item
-        )
+        .map((item, idx) => {
+          if (idx === index) {
+            return { ...item, quantity: item.quantity + delta };
+          }
+          return item;
+        })
         .filter((item) => item.quantity > 0)
     );
   };
 
+  // Calculate Total Amount (Base Price + Paid Extras)
   const totalAmount = cart.reduce((sum, item) => {
     const priceVal = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
-    return sum + priceVal * item.quantity;
+    const unitPriceWithExtras = priceVal + (item.extraPrice || 0);
+    return sum + unitPriceWithExtras * item.quantity;
   }, 0);
 
   const totalItemsCount = cart.reduce((a, c) => a + c.quantity, 0);
@@ -105,7 +160,12 @@ export default function OrderClientShell({
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            cart: cart.map((item) => ({ id: item.product.id, quantity: item.quantity })),
+            cart: cart.map((item) => ({
+              id: item.product.id,
+              quantity: item.quantity,
+              notes: item.notes || [],
+              extraPrice: item.extraPrice || 0,
+            })),
           }),
         }
       );
@@ -144,7 +204,7 @@ export default function OrderClientShell({
             </Link>
           )}
 
-          {/* Cart Pill in Header (Triggers Mobile Cart Sheet on Mobile/Tablet) */}
+          {/* Cart Pill in Header */}
           <button
             onClick={() => setIsMobileCartOpen(true)}
             className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-bold text-xs sm:text-sm hover:bg-amber-500/20 transition"
@@ -218,8 +278,10 @@ export default function OrderClientShell({
                         {product.description || 'Prepared fresh on demand.'}
                       </p>
                     </div>
+                    
+                    {/* 🚀 OPENS MODIFIER MODAL ON CLICK */}
                     <button
-                      onClick={() => addToCart(product)}
+                      onClick={() => setSelectedProductForModifier(product)}
                       className="mt-3 sm:mt-4 w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition"
                     >
                       <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add to Order
@@ -250,23 +312,38 @@ export default function OrderClientShell({
             <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
           ) : (
             <div className="space-y-4 max-h-75 overflow-y-auto pr-2">
-              {cart.map((item) => {
-                const itemPrice = formatPrice(item.product.price || (item.product as Product).unit_price);
+              {cart.map((item, index) => {
+                const basePrice = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
+                const itemUnitPrice = basePrice + (item.extraPrice || 0);
+
                 return (
-                  <div key={item.product.id} className="flex items-center justify-between text-sm">
-                    <div>
-                      <p className="font-semibold text-white">{item.product.name}</p>
-                      <p className="text-zinc-400 text-xs">€{itemPrice} each</p>
+                  <div key={index} className="space-y-1.5 border-b border-zinc-800/60 pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between text-sm">
+                      <div>
+                        <p className="font-semibold text-white">{item.product.name}</p>
+                        <p className="text-zinc-400 text-xs">€{itemUnitPrice.toFixed(2)} each</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => updateCartQuantity(index, -1)} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700">
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="font-bold text-xs">{item.quantity}</span>
+                        <button onClick={() => updateCartQuantity(index, 1)} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => removeFromCart(item.product.id)} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700">
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="font-bold text-xs">{item.quantity}</span>
-                      <button onClick={() => addToCart(item.product)} className="p-1 bg-zinc-800 rounded hover:bg-zinc-700">
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+
+                    {/* 🚀 DISPLAY ACTIVE CUSTOM NOTES / EXTRAS */}
+                    {item.notes && item.notes.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {item.notes.map((note) => (
+                          <span key={note} className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            {note}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -280,11 +357,17 @@ export default function OrderClientShell({
             </div>
 
             <button
-              disabled={cart.length === 0 || isProcessingCheckout}
+              disabled={cart.length === 0 || isProcessingCheckout || !storeStatus.is_open}
               onClick={handleProceedToCheckout}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
+              className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
             >
-              {isProcessingCheckout ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Proceed to Stripe Checkout'}
+              {!storeStatus.is_open ? (
+                'Restaurant Closed'
+              ) : isProcessingCheckout ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                'Proceed to Stripe Checkout'
+              )}
             </button>
           </div>
         </div>
@@ -329,34 +412,49 @@ export default function OrderClientShell({
               {cart.length === 0 ? (
                 <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
               ) : (
-                cart.map((item) => {
-                  const itemPrice = formatPrice(item.product.price || (item.product as Product).unit_price);
+                cart.map((item, index) => {
+                  const basePrice = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
+                  const itemUnitPrice = basePrice + (item.extraPrice || 0);
+
                   return (
                     <div
-                      key={item.product.id}
-                      className="flex items-center justify-between bg-zinc-950 border border-zinc-800/80 p-3.5 rounded-2xl"
+                      key={index}
+                      className="bg-zinc-950 border border-zinc-800/80 p-3.5 rounded-2xl space-y-2"
                     >
-                      <div className="pr-2 min-w-0">
-                        <p className="font-bold text-sm text-white truncate">{item.product.name}</p>
-                        <p className="text-amber-400 text-xs font-semibold mt-0.5">€{itemPrice} each</p>
+                      <div className="flex items-center justify-between">
+                        <div className="pr-2 min-w-0">
+                          <p className="font-bold text-sm text-white truncate">{item.product.name}</p>
+                          <p className="text-amber-400 text-xs font-semibold mt-0.5">€{itemUnitPrice.toFixed(2)} each</p>
+                        </div>
+
+                        {/* Quantity Controls inside Drawer */}
+                        <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1.5 rounded-xl shrink-0">
+                          <button
+                            onClick={() => updateCartQuantity(index, -1)}
+                            className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="font-extrabold text-xs px-1.5">{item.quantity}</span>
+                          <button
+                            onClick={() => updateCartQuantity(index, 1)}
+                            className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Quantity Controls inside Drawer */}
-                      <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1.5 rounded-xl shrink-0">
-                        <button
-                          onClick={() => removeFromCart(item.product.id)}
-                          className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="font-extrabold text-xs px-1.5">{item.quantity}</span>
-                        <button
-                          onClick={() => addToCart(item.product)}
-                          className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {/* Active Custom Notes Badges */}
+                      {item.notes && item.notes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1.5 border-t border-zinc-900">
+                          {item.notes.map((note) => (
+                            <span key={note} className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                              {note}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -370,12 +468,27 @@ export default function OrderClientShell({
                 <span className="text-amber-400 text-xl">€{totalAmount.toFixed(2)}</span>
               </div>
 
+              {/* RESTAURANT CLOSED BANNER */}
+              {!storeStatus.is_open && (
+                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl text-xs flex items-center justify-between mb-2 font-semibold">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    <span>
+                      🔴 Restaurant is closed. Hours: {storeStatus.schedule}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Checkout Button */}
               <button
-                disabled={cart.length === 0 || isProcessingCheckout}
+                disabled={cart.length === 0 || isProcessingCheckout || !storeStatus.is_open}
                 onClick={handleProceedToCheckout}
-                className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
+                className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
               >
-                {isProcessingCheckout ? (
+                {!storeStatus.is_open ? (
+                  'Restaurant Closed'
+                ) : isProcessingCheckout ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   'Proceed to Stripe Checkout'
@@ -395,7 +508,7 @@ export default function OrderClientShell({
             </button>
             <Lock className="w-10 h-10 text-amber-400 mx-auto mb-3" />
             <h3 className="text-xl font-extrabold">Login Required</h3>
-            <p className="text-zinc-400 text-xs mt-2">Please sign in to place a Click & Collect order.</p>
+            <p className="text-zinc-400 text-xs mt-2">Please sign in to place a Click &amp; Collect order.</p>
             <button
               onClick={() => router.push('/client/login')}
               className="w-full bg-amber-500 text-zinc-950 font-bold py-3 rounded-xl text-sm mt-6"
@@ -404,6 +517,18 @@ export default function OrderClientShell({
             </button>
           </div>
         </div>
+      )}
+
+      {/* 🚀 ITEM MODIFIER CUSTOMIZATION MODAL */}
+      {selectedProductForModifier && (
+        <ItemModifierModal
+          product={selectedProductForModifier}
+          onClose={() => setSelectedProductForModifier(null)}
+          onConfirm={(product, notes, extraPrice) => {
+            addToCartWithNotes(product, notes, extraPrice);
+            setSelectedProductForModifier(null);
+          }}
+        />
       )}
     </div>
   );
