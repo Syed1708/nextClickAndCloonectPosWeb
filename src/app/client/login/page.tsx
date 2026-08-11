@@ -2,12 +2,17 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, Mail, Loader2, ArrowLeft, User } from 'lucide-react';
 
 export default function CustomerLoginPage() {
-  const router = useRouter();
+
+    const searchParams = useSearchParams();
+  
+  // 🚀 2. Read callbackUrl from URL parameter (default to /client/profile)
+  const callbackUrl = searchParams.get('callbackUrl') || '/client/profile';
+  // const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,8 +34,10 @@ export default function CustomerLoginPage() {
       setError('Invalid customer email or password');
       setLoading(false);
     } else {
-      router.push('/client/profile');
-      router.refresh();
+      // router.push('/client/profile');
+      // router.refresh();
+      // 🚀 3. Redirects to callbackUrl (/reservation) or /client/profile
+      window.location.href = callbackUrl;
     }
   };
 

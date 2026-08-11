@@ -13,10 +13,12 @@ import {
   Loader2,
   Lock,
   X,
+  AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { Product } from '../types';
 import { getImageUrl, formatPrice } from '../lib/api';
-import ItemModifierModal from '../components/client/ItemModifierModal'; // 🚀 Import Item Modifier Modal
+import ItemModifierModal from '../components/client/ItemModifierModal';
 
 export interface CartItem {
   product: Product;
@@ -49,14 +51,23 @@ export default function OrderClientShell({
   // Active product selected for modifier modal
   const [selectedProductForModifier, setSelectedProductForModifier] = useState<Product | null>(null);
 
-  // 🚀 Store Opening Hours State
-  const [storeStatus, setStoreStatus] = useState<{ is_open: boolean; schedule: string }>({
+  // 🚀 1. STORE OPENING & GLOBAL SETTINGS STATE
+  const [storeStatus, setStoreStatus] = useState<{
+    is_open: boolean;                 // Current time is within shift schedule
+    is_store_open: boolean;           // Master Admin Toggle
+    online_orders_enabled: boolean;   // Online Ordering Toggle
+    schedule: string;
+    closed_message: string;
+  }>({
     is_open: true,
-    schedule: '10:00 - 14:30 & 18:30 - 06:30',
+    is_store_open: true,
+    online_orders_enabled: true,
+    schedule: '10:00 - 14:30 & 18:30 - 22:30',
+    closed_message: 'Restaurant is currently closed for online ordering.',
   });
 
   useEffect(() => {
-    // Fetch live opening status from Laravel
+    // Fetch live opening status & global settings from Laravel
     async function checkStoreStatus() {
       try {
         const res = await fetch(
@@ -65,7 +76,6 @@ export default function OrderClientShell({
         if (res.ok) {
           const data = await res.json();
           setStoreStatus(data);
-          console.log('Store status fetched:', data);
         }
       } catch (e) {
         console.error('Failed to fetch store status:', e);
@@ -73,6 +83,12 @@ export default function OrderClientShell({
     }
     checkStoreStatus();
   }, []);
+
+  // 🚀 2. MASTER ONLINE ORDERING PERMISSION CHECK
+  const canOrderOnline =
+    storeStatus.is_store_open &&
+    storeStatus.online_orders_enabled &&
+    storeStatus.is_open;
 
   // Modals state
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -93,12 +109,14 @@ export default function OrderClientShell({
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
-  // 🚀 Add to Cart with Custom Notes & Paid Extras
+  // Add to Cart
   const addToCartWithNotes = (
     product: Product,
     notes: string[] = [],
     extraPrice: number = 0
   ) => {
+    if (!canOrderOnline) return;
+
     setCart((prev) => {
       const notesKey = notes.sort().join('|');
 
@@ -118,7 +136,7 @@ export default function OrderClientShell({
     });
   };
 
-  // Quantity Management by Index
+  // Quantity Management
   const updateCartQuantity = (index: number, delta: number) => {
     setCart((prev) =>
       prev
@@ -132,7 +150,7 @@ export default function OrderClientShell({
     );
   };
 
-  // Calculate Total Amount (Base Price + Paid Extras)
+  // Calculate Total Amount
   const totalAmount = cart.reduce((sum, item) => {
     const priceVal = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
     const unitPriceWithExtras = priceVal + (item.extraPrice || 0);
@@ -141,7 +159,13 @@ export default function OrderClientShell({
 
   const totalItemsCount = cart.reduce((a, c) => a + c.quantity, 0);
 
+  // 🚀 3. CHECKOUT SUBMISSION GUARD
   const handleProceedToCheckout = async () => {
+    if (!canOrderOnline) {
+      alert(storeStatus.closed_message || 'Online ordering is currently closed.');
+      return;
+    }
+
     if (!isLoggedIn || !accessToken) {
       setIsMobileCartOpen(false);
       setShowAuthModal(true);
@@ -220,6 +244,27 @@ export default function OrderClientShell({
         
         {/* Left: Product Catalog */}
         <div className="lg:col-span-2 space-y-6">
+          
+          {/* 🚀 4. PROMINENT WARNING BANNER WHEN ORDERING IS BLOCKED */}
+          {!canOrderOnline && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl flex items-start gap-3 text-xs sm:text-sm font-semibold">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+              <div>
+                <p className="font-extrabold text-red-300">
+                  {!storeStatus.is_store_open
+                    ? 'Restaurant Temporarily Closed'
+                    : !storeStatus.online_orders_enabled
+                    ? 'Online Ordering Disabled'
+                    : 'Outside Operating Hours'}
+                </p>
+                <p className="mt-1 text-red-400/90">{storeStatus.closed_message}</p>
+                <p className="mt-1 text-zinc-400 text-xs flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-zinc-500" /> Opening Hours: {storeStatus.schedule}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3 sm:space-y-4">
             <div className="relative">
               <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -279,12 +324,14 @@ export default function OrderClientShell({
                       </p>
                     </div>
                     
-                    {/* 🚀 OPENS MODIFIER MODAL ON CLICK */}
+                    {/* 🚀 DISABLED WHEN ONLINE ORDERING IS BLOCKED */}
                     <button
+                      disabled={!canOrderOnline}
                       onClick={() => setSelectedProductForModifier(product)}
-                      className="mt-3 sm:mt-4 w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition"
+                      className="mt-3 sm:mt-4 w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition disabled:cursor-not-allowed"
                     >
-                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add to Order
+                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      {!canOrderOnline ? 'Ordering Closed' : 'Add to Order'}
                     </button>
                   </div>
                 </div>
@@ -334,7 +381,6 @@ export default function OrderClientShell({
                       </div>
                     </div>
 
-                    {/* 🚀 DISPLAY ACTIVE CUSTOM NOTES / EXTRAS */}
                     {item.notes && item.notes.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {item.notes.map((note) => (
@@ -356,13 +402,14 @@ export default function OrderClientShell({
               <span className="text-amber-400">€{totalAmount.toFixed(2)}</span>
             </div>
 
+            {/* 🚀 DESKTOP CHECKOUT BUTTON BLOCKED WHEN CANNOT ORDER */}
             <button
-              disabled={cart.length === 0 || isProcessingCheckout || !storeStatus.is_open}
+              disabled={cart.length === 0 || isProcessingCheckout || !canOrderOnline}
               onClick={handleProceedToCheckout}
-              className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
+              className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition disabled:cursor-not-allowed"
             >
-              {!storeStatus.is_open ? (
-                'Restaurant Closed'
+              {!canOrderOnline ? (
+                'Ordering Closed'
               ) : isProcessingCheckout ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
@@ -373,7 +420,7 @@ export default function OrderClientShell({
         </div>
       </div>
 
-      {/* 🚀 FLOATING SHOPPING BAG BUTTON FOR MOBILE / TABLET */}
+      {/* Floating Shopping Bag Button */}
       {totalItemsCount > 0 && (
         <button
           onClick={() => setIsMobileCartOpen(true)}
@@ -387,11 +434,10 @@ export default function OrderClientShell({
         </button>
       )}
 
-      {/* 🚀 MOBILE / TABLET SLIDE-UP CART DRAWER (SHEET) */}
+      {/* Mobile / Tablet Cart Drawer */}
       {isMobileCartOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end lg:hidden animate-in fade-in duration-200">
           <div className="bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-5 sm:p-6 space-y-5 max-h-[85vh] flex flex-col shadow-2xl">
-            {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-amber-500" />
@@ -407,7 +453,6 @@ export default function OrderClientShell({
               </button>
             </div>
 
-            {/* Scrollable Item List */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
               {cart.length === 0 ? (
                 <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
@@ -427,7 +472,6 @@ export default function OrderClientShell({
                           <p className="text-amber-400 text-xs font-semibold mt-0.5">€{itemUnitPrice.toFixed(2)} each</p>
                         </div>
 
-                        {/* Quantity Controls inside Drawer */}
                         <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1.5 rounded-xl shrink-0">
                           <button
                             onClick={() => updateCartQuantity(index, -1)}
@@ -445,7 +489,6 @@ export default function OrderClientShell({
                         </div>
                       </div>
 
-                      {/* Active Custom Notes Badges */}
                       {item.notes && item.notes.length > 0 && (
                         <div className="flex flex-wrap gap-1 pt-1.5 border-t border-zinc-900">
                           {item.notes.map((note) => (
@@ -461,33 +504,26 @@ export default function OrderClientShell({
               )}
             </div>
 
-            {/* Drawer Footer with Total & Checkout */}
             <div className="border-t border-zinc-800 pt-4 space-y-4">
               <div className="flex justify-between items-center font-black text-lg">
                 <span className="text-white">Total Amount:</span>
                 <span className="text-amber-400 text-xl">€{totalAmount.toFixed(2)}</span>
               </div>
 
-              {/* RESTAURANT CLOSED BANNER */}
-              {!storeStatus.is_open && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl text-xs flex items-center justify-between mb-2 font-semibold">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                    <span>
-                      🔴 Restaurant is closed. Hours: {storeStatus.schedule}
-                    </span>
-                  </div>
+              {!canOrderOnline && (
+                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-xl text-xs font-semibold">
+                  🔴 {storeStatus.closed_message}
                 </div>
               )}
 
-              {/* Checkout Button */}
+              {/* 🚀 MOBILE CHECKOUT BUTTON BLOCKED WHEN CANNOT ORDER */}
               <button
-                disabled={cart.length === 0 || isProcessingCheckout || !storeStatus.is_open}
+                disabled={cart.length === 0 || isProcessingCheckout || !canOrderOnline}
                 onClick={handleProceedToCheckout}
-                className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition"
+                className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-extrabold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition disabled:cursor-not-allowed"
               >
-                {!storeStatus.is_open ? (
-                  'Restaurant Closed'
+                {!canOrderOnline ? (
+                  'Ordering Closed'
                 ) : isProcessingCheckout ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
@@ -519,7 +555,7 @@ export default function OrderClientShell({
         </div>
       )}
 
-      {/* 🚀 ITEM MODIFIER CUSTOMIZATION MODAL */}
+      {/* Item Modifier Modal */}
       {selectedProductForModifier && (
         <ItemModifierModal
           product={selectedProductForModifier}

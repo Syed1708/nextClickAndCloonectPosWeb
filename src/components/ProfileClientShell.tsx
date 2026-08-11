@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Session } from 'next-auth';
 import Link from 'next/link';
 import RealtimeTracker from '../components/RealtimeTracker';
+import CustomerReservationsTab from '../components/client/CustomerReservationsTab'; // 🚀 Import Reservations Tab
 import {
   ShoppingBag,
   User as UserIcon,
@@ -18,24 +19,28 @@ import {
   Mail,
   Check,
   Loader2,
+  Armchair, // 🚀 Import Armchair Icon
 } from 'lucide-react';
 import { ClientProfile, Order } from '../types';
 
 interface ClientDashboardShellProps {
   session: Session | null;
-  clientProfile: ClientProfile | any | null; // 🚀 FIX: Allows NextAuth user object or Laravel profile
+  clientProfile: ClientProfile | any | null;
   initialOrders: Order[];
 }
+
 export default function ClientDashboardShell({
   session,
   clientProfile,
   initialOrders,
 }: ClientDashboardShellProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'tracker' | 'orders' | 'profile'>('tracker');
+  
+  // 🚀 1. Add 'reservations' to activeTab state!
+  const [activeTab, setActiveTab] = useState<'tracker' | 'orders' | 'reservations' | 'profile'>('tracker');
   const [orders] = useState<Order[]>(initialOrders);
 
-  // 🚀 Initialize form with FRESH MySQL data from clientProfile prop!
+  // Initialize form with FRESH MySQL data
   const [profileData, setProfileData] = useState({
     name: clientProfile?.name || session?.user?.name || '',
     email: clientProfile?.email || session?.user?.email || '',
@@ -45,7 +50,7 @@ export default function ClientDashboardShell({
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-    // 🚀 FAIL-SAFE: Verifies Stripe payment on page load if arriving from checkout
+  // Verifies Stripe payment on page load if arriving from checkout
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -71,13 +76,11 @@ export default function ClientDashboardShell({
     }
   }, [router]);
 
-  // 🚀 FIX: Filters active orders using preparation_status!
+  // Filters active orders using preparation_status
   const activeOrders = orders.filter((o) => {
     const prepStatus = o.preparation_status || 'pending';
     return prepStatus !== 'delivered' && prepStatus !== 'cancelled';
   });
-
-  
 
   const handleSaveProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -85,9 +88,9 @@ export default function ClientDashboardShell({
     setSavedSuccess(false);
 
     try {
-      const token = session?.accessToken;
+      const token = (session as any)?.accessToken;
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/Api/v1/client/profile`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/v1/client/profile`,
         {
           method: 'PUT',
           headers: {
@@ -104,7 +107,6 @@ export default function ClientDashboardShell({
 
       if (res.ok) {
         setSavedSuccess(true);
-        // 🚀 Triggers Next.js SSR to fetch latest MySQL records!
         router.refresh();
         setTimeout(() => setSavedSuccess(false), 3500);
       }
@@ -128,13 +130,22 @@ export default function ClientDashboardShell({
             <span className="text-lg font-black tracking-tight">Customer Portal</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* 🚀 NEW: Book Table Header Button */}
+            <Link
+              href="/reservation"
+              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-bold text-xs px-4 py-2.5 rounded-full flex items-center gap-2 transition"
+            >
+              <Armchair className="w-4 h-4 text-amber-500" /> Book Table
+            </Link>
+
             <Link
               href="/order"
               className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs px-4 py-2.5 rounded-full flex items-center gap-2 transition"
             >
               <ShoppingBag className="w-4 h-4" /> Order Online
             </Link>
+            
             <button
               onClick={() => signOut({ callbackUrl: '/client/login' })}
               className="bg-zinc-900 hover:bg-red-500/10 hover:text-red-400 border border-zinc-800 text-zinc-400 px-4 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 transition"
@@ -156,7 +167,7 @@ export default function ClientDashboardShell({
               </div>
               <div>
                 <h2 className="font-extrabold text-base">{profileData.name || session?.user?.name}</h2>
-                <p className="text-zinc-500 text-xs truncate max-w-37.5">{profileData.email}</p>
+                <p className="text-zinc-500 text-xs truncate max-w-[150px]">{profileData.email}</p>
               </div>
             </div>
 
@@ -181,6 +192,18 @@ export default function ClientDashboardShell({
                 }`}
               >
                 <ShoppingBag className="w-4 h-4" /> Order History ({orders.length})
+              </button>
+
+              {/* 🚀 2. NEW: Table Bookings Tab */}
+              <button
+                onClick={() => setActiveTab('reservations')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition ${
+                  activeTab === 'reservations'
+                    ? 'bg-amber-500 text-zinc-950'
+                    : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                }`}
+              >
+                <Armchair className="w-4 h-4" /> Table Bookings
               </button>
 
               <button
@@ -214,7 +237,7 @@ export default function ClientDashboardShell({
                     href="/order"
                     className="inline-block bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs px-6 py-3 rounded-xl transition mt-2"
                   >
-                    Place Click & Collect Order
+                    Place Click &amp; Collect Order
                   </Link>
                 </div>
               )}
@@ -245,6 +268,11 @@ export default function ClientDashboardShell({
                 ))}
               </div>
             </div>
+          )}
+
+          {/* 🚀 3. NEW: Table Bookings Tab Content */}
+          {activeTab === 'reservations' && (
+            <CustomerReservationsTab accessToken={(session as any)?.accessToken || null} />
           )}
 
           {activeTab === 'profile' && (
