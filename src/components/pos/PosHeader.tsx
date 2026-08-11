@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
-import { ArrowLeft, RefreshCw, History, Receipt, LogOut } from 'lucide-react';
+import { ArrowLeft, RefreshCw, History, Receipt, LogOut, Armchair } from 'lucide-react';
 
 interface PosHeaderProps {
   cashierName: string;
@@ -61,6 +61,15 @@ export default function PosHeader({
             <span>Sync ({pendingSyncCount})</span>
           </button>
         )}
+
+          {/* 🚀 NEW: RESERVATIONS LINK BUTTON */}
+  <Link
+    href="/pos/reservations"
+    className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-xl text-xs font-bold transition"
+  >
+    <Armchair className="w-3.5 h-3.5 text-amber-500" />
+    <span className="hidden sm:inline">Reservations</span>
+  </Link>
 
         <button
           onClick={onOpenSalesHistory}
