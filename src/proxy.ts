@@ -50,6 +50,14 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(new URL('/pos', req.url));
     }
   }
+  // 🚀 RULE 5: PROTECT /reservation (BLOCK STAFF FROM ONLINE CUSTOMER RESERVATION PAGE)
+  if (pathname.startsWith('/reservation')) {
+  if (token && userType === 'staff') {
+    return NextResponse.redirect(new URL('/pos', req.url));
+  }
+
+
+}
 
   return NextResponse.next();
 }
@@ -62,6 +70,7 @@ export const config = {
     '/pos/login',
     '/pos/:path*',
     '/client/profile/:path*',
-    '/order/:path*'
+    '/order/:path*',
+    '/reservation/:path*',
   ],
 };

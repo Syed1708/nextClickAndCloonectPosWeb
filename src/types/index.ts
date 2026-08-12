@@ -2,11 +2,15 @@ export interface Product {
   id: number;
   name: string;
   description?: string;
+  ingredients?: string[] | string;
+  allergens?: string[] | string;
+  dietary_flags?: string[] | string;
+  calories?: string;
   price?: any;
   unit_price?: any;
   amount?: any;
   vat_rate?: number | string; // 🚀 Dynamic TVA (5.50, 10.00, 20.00) from Laravel DB
-  image: string | null;
+  image_path: string | null;
   is_active?: boolean;
   category_id?: number;
   category_name?: string;
@@ -18,7 +22,7 @@ export interface ClientProfile {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
-  userType?: 'client' | 'staff';
+  userType?: "client" | "staff";
   role?: string;
 }
 

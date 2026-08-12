@@ -37,15 +37,43 @@ export function formatPrice(price: any): string {
   return num.toFixed(2);
 }
 
-export function getImageUrl(imagePath: string | null | undefined): string {
+// export function getImageUrl(imagePath: string | null | undefined): string {
   
-  if (!imagePath || imagePath === 'null' || imagePath === 'undefined' || imagePath.trim() === '') {
-    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" fill="%2318181b"><rect width="400" height="300"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2371717a" font-family="sans-serif" font-size="16" font-weight="bold">Burger Palace</text></svg>`;
+//   if (!imagePath || imagePath === 'null' || imagePath === 'undefined' || imagePath.trim() === '') {
+//     return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" fill="%2318181b"><rect width="400" height="300"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2371717a" font-family="sans-serif" font-size="16" font-weight="bold">Burger Palace</text></svg>`;
+//   }
+//   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+//     return imagePath;
+//   }
+//   return `${API_BASE_URL}/storage/${imagePath.replace(/^\//, '')}`;
+// }
+
+
+// src/lib/api.ts
+
+export function getImageUrl(imagePath?: string | null): string {
+  if (!imagePath) {
+    return '/images/placeholder-burger.jpg'; // Fallback placeholder
   }
+
+  // If already a full URL (e.g. https://...)
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
-  return `${API_BASE_URL}/storage/${imagePath.replace(/^\//, '')}`;
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  const cleanPath = imagePath.replace(/^\/+/, ''); // Strip leading slashes
+
+  // 🚀 Converts "uploads/eSP165p..." to "http://127.0.0.1:8000/storage/uploads/eSP165p..."
+  if (cleanPath.startsWith('uploads/')) {
+    return `${apiBase}/storage/${cleanPath}`;
+  }
+
+  if (cleanPath.startsWith('storage/')) {
+    return `${apiBase}/${cleanPath}`;
+  }
+
+  return `${apiBase}/storage/${cleanPath}`;
 }
 
 export async function fetchMenu(): Promise<Product[]> {

@@ -15,6 +15,7 @@ import {
   X,
   AlertCircle,
   Clock,
+  Info,
 } from 'lucide-react';
 import { Product } from '../types';
 import { getImageUrl, formatPrice } from '../lib/api';
@@ -51,23 +52,22 @@ export default function OrderClientShell({
   // Active product selected for modifier modal
   const [selectedProductForModifier, setSelectedProductForModifier] = useState<Product | null>(null);
 
-  // 🚀 1. STORE OPENING & GLOBAL SETTINGS STATE
+  // Store Opening & Global Settings State
   const [storeStatus, setStoreStatus] = useState<{
-    is_open: boolean;                 // Current time is within shift schedule
-    is_store_open: boolean;           // Master Admin Toggle
-    online_orders_enabled: boolean;   // Online Ordering Toggle
+    is_open: boolean;
+    is_store_open: boolean;
+    online_orders_enabled: boolean;
     schedule: string;
     closed_message: string;
   }>({
     is_open: true,
     is_store_open: true,
     online_orders_enabled: true,
-    schedule: '10:00 - 14:30 & 18:30 - 22:30',
+    schedule: '10:00 - 14:30 & 18:30 - 06:30',
     closed_message: 'Restaurant is currently closed for online ordering.',
   });
 
   useEffect(() => {
-    // Fetch live opening status & global settings from Laravel
     async function checkStoreStatus() {
       try {
         const res = await fetch(
@@ -84,13 +84,12 @@ export default function OrderClientShell({
     checkStoreStatus();
   }, []);
 
-  // 🚀 2. MASTER ONLINE ORDERING PERMISSION CHECK
+  // 🚀 Master Permission Check for Online Ordering
   const canOrderOnline =
     storeStatus.is_store_open &&
     storeStatus.online_orders_enabled &&
     storeStatus.is_open;
 
-  // Modals state
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
@@ -136,7 +135,6 @@ export default function OrderClientShell({
     });
   };
 
-  // Quantity Management
   const updateCartQuantity = (index: number, delta: number) => {
     setCart((prev) =>
       prev
@@ -150,7 +148,6 @@ export default function OrderClientShell({
     );
   };
 
-  // Calculate Total Amount
   const totalAmount = cart.reduce((sum, item) => {
     const priceVal = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
     const unitPriceWithExtras = priceVal + (item.extraPrice || 0);
@@ -159,7 +156,6 @@ export default function OrderClientShell({
 
   const totalItemsCount = cart.reduce((a, c) => a + c.quantity, 0);
 
-  // 🚀 3. CHECKOUT SUBMISSION GUARD
   const handleProceedToCheckout = async () => {
     if (!canOrderOnline) {
       alert(storeStatus.closed_message || 'Online ordering is currently closed.');
@@ -245,7 +241,7 @@ export default function OrderClientShell({
         {/* Left: Product Catalog */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* 🚀 4. PROMINENT WARNING BANNER WHEN ORDERING IS BLOCKED */}
+          {/* Warning Banner when Ordering Closed */}
           {!canOrderOnline && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl flex items-start gap-3 text-xs sm:text-sm font-semibold">
               <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
@@ -298,16 +294,27 @@ export default function OrderClientShell({
             </div>
           </div>
 
-          {/* Product Grid */}
+          {/* Product Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {displayedProducts.map((product) => {
               const displayPrice = formatPrice(product.price || (product as Product).unit_price);
 
               return (
-                <div key={product.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between">
+                <div key={product.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between group">
                   <div className="relative h-36 sm:h-44 w-full bg-zinc-800">
-                    <Image src={getImageUrl(product.image)} alt={product.name} fill className="object-cover" />
+                    <Image src={getImageUrl(product.image_path)} alt={product.name} unoptimized fill className="object-cover group-hover:scale-105 transition" />
+                    
+                    {/* 🚀 MORE INFO LINK OVERLAY ON IMAGE */}
+                    <Link
+                      href={`/product/${product.id}`}
+                      scroll={false} // 🚀 Triggers Intercepted Route Modal without losing scroll position!
+                      className="absolute top-3 right-3 bg-zinc-950/80 hover:bg-zinc-800 text-amber-400 p-2 rounded-xl backdrop-blur border border-zinc-800 transition"
+                      title="View Details & Allergens"
+                    >
+                      <Info className="w-4 h-4" />
+                    </Link>
                   </div>
+
                   <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
                     <div>
                       {product.category_name && (
@@ -319,20 +326,38 @@ export default function OrderClientShell({
                         <h3 className="font-bold text-sm sm:text-base text-white">{product.name}</h3>
                         <span className="text-amber-400 font-extrabold text-sm sm:text-base">€{displayPrice}</span>
                       </div>
-                      <p className="text-zinc-400 text-[11px] sm:text-xs mt-1 line-clamp-2">
-                        {product.description || 'Prepared fresh on demand.'}
-                      </p>
+                      <p
+                        className="text-zinc-400 text-[11px] sm:text-xs mt-1 line-clamp-2"
+                        dangerouslySetInnerHTML={{
+                          __html:
+                            product.description ||
+                            'Prepared fresh on demand with premium local ingredients.',
+                        }}
+                      />
+
                     </div>
                     
-                    {/* 🚀 DISABLED WHEN ONLINE ORDERING IS BLOCKED */}
-                    <button
-                      disabled={!canOrderOnline}
-                      onClick={() => setSelectedProductForModifier(product)}
-                      className="mt-3 sm:mt-4 w-full bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      {!canOrderOnline ? 'Ordering Closed' : 'Add to Order'}
-                    </button>
+                    <div className="flex gap-2 mt-3 sm:mt-4">
+                      {/* 🚀 MORE INFO LINK BUTTON */}
+                      <Link
+                        href={`/product/${product.id}`}
+                        scroll={false} // 🚀 Triggers Intercepted Route Modal without losing scroll position!
+                        className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 rounded-xl transition flex items-center justify-center shrink-0"
+                        title="View Details & Allergens"
+                      >
+                        <Info className="w-4 h-4" />
+                      </Link>
+
+                      {/* ADD TO ORDER BUTTON */}
+                      <button
+                        disabled={!canOrderOnline}
+                        onClick={() => setSelectedProductForModifier(product)}
+                        className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition disabled:cursor-not-allowed"
+                      >
+                        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        {!canOrderOnline ? 'Closed' : 'Add to Order'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -402,7 +427,6 @@ export default function OrderClientShell({
               <span className="text-amber-400">€{totalAmount.toFixed(2)}</span>
             </div>
 
-            {/* 🚀 DESKTOP CHECKOUT BUTTON BLOCKED WHEN CANNOT ORDER */}
             <button
               disabled={cart.length === 0 || isProcessingCheckout || !canOrderOnline}
               onClick={handleProceedToCheckout}
@@ -516,7 +540,6 @@ export default function OrderClientShell({
                 </div>
               )}
 
-              {/* 🚀 MOBILE CHECKOUT BUTTON BLOCKED WHEN CANNOT ORDER */}
               <button
                 disabled={cart.length === 0 || isProcessingCheckout || !canOrderOnline}
                 onClick={handleProceedToCheckout}
