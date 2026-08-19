@@ -38,7 +38,6 @@ export default function ClientDashboardShell({
   
   // 🚀 1. Add 'reservations' to activeTab state!
   const [activeTab, setActiveTab] = useState<'tracker' | 'orders' | 'reservations' | 'profile'>('tracker');
-  const [orders] = useState<Order[]>(initialOrders);
 
   // Initialize form with FRESH MySQL data
   const [profileData, setProfileData] = useState({
@@ -50,7 +49,21 @@ export default function ClientDashboardShell({
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Verifies Stripe payment on page load if arriving from checkout
+
+
+
+
+  // 🚀 Local Orders State
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [prevInitialOrders, setPrevInitialOrders] = useState<Order[]>(initialOrders);
+
+  // 🚀 REACT 19 COMPLIANT PROP SYNC: Updates state during render without useEffect!
+  if (prevInitialOrders !== initialOrders) {
+    setPrevInitialOrders(initialOrders);
+    setOrders(initialOrders);
+  }
+
+  // 🚀 2. Instant Order Verification & Real-Time State Injection
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -64,7 +77,21 @@ export default function ClientDashboardShell({
           const res = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/checkout/verify-session?session_id=${sessionId}`
           );
+
           if (res.ok) {
+            const data = await res.json();
+
+            // 🚀 INSTANT STATE UPDATE: Add new order directly to state without waiting for refresh!
+            if (data.order) {
+              setOrders((prev) => {
+                const exists = prev.some((o) => o.id === data.order.id || o.uuid === data.order.uuid);
+                if (exists) return prev;
+                return [data.order, ...prev]; // Appends new order to the top of the list
+              });
+            }
+
+            // Clean query parameters from URL address bar
+            router.replace('/client/profile');
             router.refresh();
           }
         } catch (err) {
@@ -75,7 +102,7 @@ export default function ClientDashboardShell({
       verifyAndCreateOrder();
     }
   }, [router]);
-
+  
   // Filters active orders using preparation_status
   const activeOrders = orders.filter((o) => {
     const prepStatus = o.preparation_status || 'pending';
@@ -167,7 +194,7 @@ export default function ClientDashboardShell({
               </div>
               <div>
                 <h2 className="font-extrabold text-base">{profileData.name || session?.user?.name}</h2>
-                <p className="text-zinc-500 text-xs truncate max-w-[150px]">{profileData.email}</p>
+                <p className="text-zinc-500 text-xs truncate max-w-37.5">{profileData.email}</p>
               </div>
             </div>
 

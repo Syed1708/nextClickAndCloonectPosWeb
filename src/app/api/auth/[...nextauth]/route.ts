@@ -48,6 +48,8 @@ export const authOptions: NextAuthOptions = {
               accessToken: tokenData,
               userType: 'client',
               role: 'customer',
+                          loyaltyPoints: Number(clientData.loyalty_points || 0), // 🚀 Save loyalty points!
+
             };
           }
 
@@ -115,6 +117,7 @@ export const authOptions: NextAuthOptions = {
         token.accessToken = (user as any).accessToken;
         token.userType = (user as any).userType;
         token.role = (user as any).role;
+        token.loyaltyPoints = (user as any).loyaltyPoints || 0; 
       }
       return token;
     },
@@ -124,6 +127,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id;
         (session.user as any).userType = token.userType;
         (session.user as any).role = token.role;
+        (session.user as any).loyaltyPoints = token.loyaltyPoints || 0;
         (session as any).accessToken = token.accessToken;
       }
       return session;

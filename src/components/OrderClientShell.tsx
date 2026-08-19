@@ -16,6 +16,8 @@ import {
   AlertCircle,
   Clock,
   Info,
+  Tag,
+  Gift,
 } from 'lucide-react';
 import { Product } from '../types';
 import { getImageUrl, formatPrice } from '../lib/api';
@@ -33,6 +35,7 @@ interface OrderClientShellProps {
   isLoggedIn: boolean;
   accessToken: string | null;
   userName: string | null;
+   initialPoints?: number;
 }
 
 export default function OrderClientShell({
@@ -40,6 +43,7 @@ export default function OrderClientShell({
   isLoggedIn,
   accessToken,
   userName,
+  initialPoints = 0,
 }: OrderClientShellProps) {
   const router = useRouter();
 
@@ -52,11 +56,22 @@ export default function OrderClientShell({
   // Active product selected for modifier modal
   const [selectedProductForModifier, setSelectedProductForModifier] = useState<Product | null>(null);
 
+  // 🚀 PROMO CODE & LOYALTY POINTS STATE
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_amount: number } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+
+ 
+  const [redeemPoints, setRedeemPoints] = useState<boolean>(false);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
   // Store Opening & Global Settings State
   const [storeStatus, setStoreStatus] = useState<{
-    is_open: boolean;
-    is_store_open: boolean;
-    online_orders_enabled: boolean;
+    is_open: boolean;                 // Current time is within shift schedule
+    is_store_open: boolean;           // Master Admin Toggle
+    online_orders_enabled: boolean;   // Online Ordering Toggle
     schedule: string;
     closed_message: string;
   }>({
@@ -70,9 +85,7 @@ export default function OrderClientShell({
   useEffect(() => {
     async function checkStoreStatus() {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/store-status`
-        );
+        const res = await fetch(`${API_BASE}/api/store-status`);
         if (res.ok) {
           const data = await res.json();
           setStoreStatus(data);
@@ -82,9 +95,60 @@ export default function OrderClientShell({
       }
     }
     checkStoreStatus();
-  }, []);
+  }, [API_BASE]);
 
-  // 🚀 Master Permission Check for Online Ordering
+   const [clientPoints, setClientPoints] = useState<number>(initialPoints);
+// 🚀 Local Points State initialized with initialPoints prop
+  const [prevInitialPoints, setPrevInitialPoints] = useState<number>(initialPoints);
+
+  // 🚀 REACT 19 COMPLIANT PROP SYNC: Adjusts state during render without useEffect!
+  if (prevInitialPoints !== initialPoints) {
+    setPrevInitialPoints(initialPoints);
+    setClientPoints(initialPoints);
+  }
+
+  // 🚀 ASYNCHRONOUS API REFETCH (Zero Synchronous setState Calls in Effect Body)
+  useEffect(() => {
+    if (!isLoggedIn || !accessToken) return;
+
+    let isCancelled = false;
+
+    async function fetchPoints() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/client/profile`, {
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const points =
+            data.client?.loyalty_points ??
+            data.loyalty_points ??
+            data.data?.loyalty_points ??
+            0;
+
+          if (!isCancelled) {
+            setClientPoints(Number(points)); // Called asynchronously after fetch promise resolves
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching client points:', e);
+      }
+    }
+
+    fetchPoints();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [API_BASE, isLoggedIn, accessToken]);
+ 
+
+
+  // Master Permission Check for Online Ordering
   const canOrderOnline =
     storeStatus.is_store_open &&
     storeStatus.online_orders_enabled &&
@@ -135,6 +199,7 @@ export default function OrderClientShell({
     });
   };
 
+  // Quantity Management
   const updateCartQuantity = (index: number, delta: number) => {
     setCart((prev) =>
       prev
@@ -148,14 +213,57 @@ export default function OrderClientShell({
     );
   };
 
-  const totalAmount = cart.reduce((sum, item) => {
+  // 🚀 SUBTOTAL & DISCOUNT CALCULATIONS
+  const subtotalAmount = cart.reduce((sum, item) => {
     const priceVal = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
     const unitPriceWithExtras = priceVal + (item.extraPrice || 0);
     return sum + unitPriceWithExtras * item.quantity;
   }, 0);
 
+  const couponDiscount = appliedCoupon ? appliedCoupon.discount_amount : 0;
+  const loyaltyPointsToUse = redeemPoints && clientPoints >= 100 ? 100 : 0;
+  const loyaltyDiscount = loyaltyPointsToUse > 0 ? 5.00 : 0;
+
+  const totalDiscount = Math.min(subtotalAmount, couponDiscount + loyaltyDiscount);
+  const finalTotalAmount = Math.max(0, subtotalAmount - totalDiscount);
   const totalItemsCount = cart.reduce((a, c) => a + c.quantity, 0);
 
+
+// 🚀 FIX: Sends Bearer Token so backend knows who is applying the code
+const handleApplyPromoCode = async () => {
+  if (!promoCodeInput.trim()) return;
+  setIsApplyingPromo(true);
+  setPromoError(null);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/coupons/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // 🚀 Sends Login Token
+      },
+      body: JSON.stringify({
+        code: promoCodeInput,
+        subtotal: subtotalAmount,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.valid) {
+      setAppliedCoupon({ code: data.code, discount_amount: data.discount_amount });
+      setPromoCodeInput('');
+    } else {
+      setPromoError(data.message || 'Invalid promo code.');
+    }
+  } catch (err) {
+    setPromoError('Error validating promo code.');
+  } finally {
+    setIsApplyingPromo(false);
+  }
+};
+
+  // 🚀 CHECKOUT SUBMISSION WITH PROMO CODE & POINTS
   const handleProceedToCheckout = async () => {
     if (!canOrderOnline) {
       alert(storeStatus.closed_message || 'Online ordering is currently closed.');
@@ -171,24 +279,23 @@ export default function OrderClientShell({
     setIsProcessingCheckout(true);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/stripe/checkout-session`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            cart: cart.map((item) => ({
-              id: item.product.id,
-              quantity: item.quantity,
-              notes: item.notes || [],
-              extraPrice: item.extraPrice || 0,
-            })),
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/stripe/checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          cart: cart.map((item) => ({
+            id: item.product.id,
+            quantity: item.quantity,
+            notes: item.notes || [],
+            extraPrice: item.extraPrice || 0,
+          })),
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          points_to_redeem: loyaltyPointsToUse,
+        }),
+      });
 
       const data = await response.json();
       if (data.url) {
@@ -215,8 +322,9 @@ export default function OrderClientShell({
 
         <div className="flex items-center gap-2 sm:gap-4">
           {isLoggedIn ? (
-            <Link href="/profile" className="text-xs font-bold text-amber-400 hover:underline">
-              {userName || 'Account'}
+            <Link href="/client/profile" className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1">
+              <Gift className="w-3.5 h-3.5" />
+              <span>{userName || 'Account'} ({clientPoints} pts)</span>
             </Link>
           ) : (
             <Link href="/client/login" className="text-xs font-semibold text-zinc-300 hover:text-amber-400">
@@ -326,15 +434,14 @@ export default function OrderClientShell({
                         <h3 className="font-bold text-sm sm:text-base text-white">{product.name}</h3>
                         <span className="text-amber-400 font-extrabold text-sm sm:text-base">€{displayPrice}</span>
                       </div>
-                      <p
-                        className="text-zinc-400 text-[11px] sm:text-xs mt-1 line-clamp-2"
+                      
+                      {/* 🚀 RICH TEXT DESCRIPTION RENDERER */}
+                      <div
+                        className="text-zinc-400 text-[11px] sm:text-xs mt-1 line-clamp-2 [&_p]:m-0 [&_strong]:text-zinc-200"
                         dangerouslySetInnerHTML={{
-                          __html:
-                            product.description ||
-                            'Prepared fresh on demand with premium local ingredients.',
+                          __html: product.description || 'Prepared fresh on demand with premium local ingredients.',
                         }}
                       />
-
                     </div>
                     
                     <div className="flex gap-2 mt-3 sm:mt-4">
@@ -378,12 +485,13 @@ export default function OrderClientShell({
         </div>
 
         {/* Right: Desktop Cart Column */}
-        <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-3xl p-6 h-fit sticky top-24 space-y-6">
+        <div className="hidden lg:block bg-zinc-900 border border-zinc-800 rounded-3xl p-6 h-fit sticky top-24 space-y-5">
           <h2 className="text-lg font-bold border-b border-zinc-800 pb-3">Your Order Summary</h2>
+          
           {cart.length === 0 ? (
             <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
           ) : (
-            <div className="space-y-4 max-h-75 overflow-y-auto pr-2">
+            <div className="space-y-4 max-h-60 overflow-y-auto pr-1">
               {cart.map((item, index) => {
                 const basePrice = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
                 const itemUnitPrice = basePrice + (item.extraPrice || 0);
@@ -421,10 +529,79 @@ export default function OrderClientShell({
             </div>
           )}
 
-          <div className="border-t border-zinc-800 pt-4 space-y-4">
-            <div className="flex justify-between font-bold text-lg">
-              <span>Total Amount:</span>
-              <span className="text-amber-400">€{totalAmount.toFixed(2)}</span>
+          {/* 🚀 PROMO CODE SECTION */}
+          {cart.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                <Tag className="w-3 h-3 text-amber-500" /> Promo Code
+              </label>
+
+              {appliedCoupon ? (
+                <div className="flex justify-between items-center bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl text-xs">
+                  <span className="font-bold text-emerald-400">🎟️ {appliedCoupon.code} (-€{appliedCoupon.discount_amount.toFixed(2)})</span>
+                  <button onClick={() => setAppliedCoupon(null)} className="text-zinc-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. WELCOME10"
+                    value={promoCodeInput}
+                    onChange={(e) => setPromoCodeInput(e.target.value)}
+                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 uppercase font-mono"
+                  />
+                  <button
+                    onClick={handleApplyPromoCode}
+                    disabled={isApplyingPromo || !promoCodeInput.trim()}
+                    className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold px-3 py-2 rounded-xl text-xs transition disabled:opacity-50"
+                  >
+                    {isApplyingPromo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {promoError && <p className="text-[11px] text-red-400 font-semibold mt-1">{promoError}</p>}
+            </div>
+          )}
+
+          {/* 🚀 LOYALTY POINTS REDEMPTION SECTION */}
+          {isLoggedIn && clientPoints >= 100 && cart.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-amber-400 flex items-center gap-1">
+                  <Gift className="w-3.5 h-3.5" /> Redeem 100 Points
+                </span>
+                <input
+                  type="checkbox"
+                  checked={redeemPoints}
+                  onChange={(e) => setRedeemPoints(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-800 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
+              <p className="text-[10px] text-zinc-400">Get €5.00 OFF your order using 100 points (Balance: {clientPoints} pts).</p>
+            </div>
+          )}
+
+          {/* TOTALS BREAKDOWN */}
+          <div className="border-t border-zinc-800 pt-3 space-y-3">
+            <div className="space-y-1 text-xs text-zinc-400">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>€{subtotalAmount.toFixed(2)}</span>
+              </div>
+
+              {totalDiscount > 0 && (
+                <div className="flex justify-between text-emerald-400 font-bold">
+                  <span>Discounts &amp; Rewards</span>
+                  <span>-€{totalDiscount.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between font-black text-lg border-t border-zinc-800 pt-2">
+              <span>Total TTC</span>
+              <span className="text-amber-400">€{finalTotalAmount.toFixed(2)}</span>
             </div>
 
             <button
@@ -528,10 +705,43 @@ export default function OrderClientShell({
               )}
             </div>
 
+            {/* Mobile Promo Code & Loyalty Controls */}
+            {cart.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-zinc-800">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Promo Code"
+                    value={promoCodeInput}
+                    onChange={(e) => setPromoCodeInput(e.target.value)}
+                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white uppercase font-mono"
+                  />
+                  <button
+                    onClick={handleApplyPromoCode}
+                    className="bg-amber-500 text-zinc-950 font-bold px-3 py-2 rounded-xl text-xs"
+                  >
+                    Apply
+                  </button>
+                </div>
+
+                {isLoggedIn && clientPoints >= 100 && (
+                  <div className="flex justify-between items-center text-xs bg-amber-500/10 p-2.5 rounded-xl text-amber-400 font-bold">
+                    <span>🎁 Redeem 100 Points (€5 OFF)</span>
+                    <input
+                      type="checkbox"
+                      checked={redeemPoints}
+                      onChange={(e) => setRedeemPoints(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="border-t border-zinc-800 pt-4 space-y-4">
               <div className="flex justify-between items-center font-black text-lg">
                 <span className="text-white">Total Amount:</span>
-                <span className="text-amber-400 text-xl">€{totalAmount.toFixed(2)}</span>
+                <span className="text-amber-400 text-xl">€{finalTotalAmount.toFixed(2)}</span>
               </div>
 
               {!canOrderOnline && (

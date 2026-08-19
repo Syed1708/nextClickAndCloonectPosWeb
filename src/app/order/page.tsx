@@ -19,6 +19,7 @@ export default async function OrderPage() {
       isLoggedIn={!!session}
       accessToken={(session as any)?.accessToken || null}
       userName={session?.user?.name || null}
+      initialPoints={(session?.user as any)?.loyaltyPoints || 0} 
     />
   );
 }
