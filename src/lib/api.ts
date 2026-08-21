@@ -28,6 +28,7 @@ export interface Order {
 }
 
 
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 export function formatPrice(price: any): string {
   if (price === null || price === undefined || price === '') return '0.00';

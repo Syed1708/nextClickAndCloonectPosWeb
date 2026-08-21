@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product } from '@/types';
-import { formatPrice } from '@/lib/api';
+import { API_BASE, formatPrice } from '@/lib/api';
 import { buildOrderSyncPayload } from '@/lib/posPayload';
 import {
   getPendingOfflineOrdersCount,
@@ -14,6 +14,8 @@ import PosCategorySidebar from './PosCategorySidebar';
 import PosProductGrid from './PosProductGrid';
 import PosTicketSidebar from './PosTicketSidebar';
 import PosModals from './PosModals';
+import PosKioskUnpaidModal from './PosKioskUnpaidModal';
+import Pusher from 'pusher-js';
 
 
 export interface PosCartItem {
@@ -118,12 +120,22 @@ export default function PosClientShell({
     };
   }, [triggerAutoSync]);
 
-  const categories = ['All', ...Array.from(new Set(products.map((p) => p.category_name || 'Burgers')))];
+  
 
+  // 🚀 FIX: Safely extracts category name from product.category.name OR product.category_name
+  const getProductCategory = (p: Product) =>
+    p.category?.name || (p as any).category_name || 'Uncategorized';
+
+  // 🚀 Extract ALL unique categories dynamically
+  const categories = useMemo(() => {
+    return ['All', ...Array.from(new Set(products.map((p) => getProductCategory(p))))];
+  }, [products]);
+
+  // 🚀 Filter products by search term and selected category
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory =
-      selectedCategory === 'All' || (product.category_name || 'Burgers') === selectedCategory;
+      selectedCategory === 'All' || getProductCategory(product) === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -215,7 +227,90 @@ export default function PosClientShell({
     }
   };
 
-// 🚀 HARDENED WEB REFUND HANDLER
+  // State for Unpaid Kiosk Counter
+  const [unpaidKioskCount, setUnpaidKioskCount] = useState(0);
+  const [showUnpaidKioskModal, setShowUnpaidKioskModal] = useState(false);
+
+  // 🚀 1. Standalone Refetcher for Event Handlers (Called when an order is paid or voided)
+  const refreshKioskCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/pos/kiosk-unpaid-orders`, {
+        headers: {
+          'Accept': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUnpaidKioskCount(Array.isArray(data) ? data.length : 0);
+      }
+    } catch (e) {
+      console.error('Error refreshing kiosk count:', e);
+    }
+  }, [accessToken]);
+
+  // 🚀 2. React 19 Compliant Effect (Purely Asynchronous, Zero Synchronous setState in Body)
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadInitialCount() {
+      try {
+        const res = await fetch(`${API_BASE}/api/pos/kiosk-unpaid-orders`, {
+          headers: {
+            'Accept': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (!isCancelled) {
+            setUnpaidKioskCount(Array.isArray(data) ? data.length : 0); // Asynchronous state update
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching initial unpaid kiosk count:', e);
+      }
+    }
+
+    loadInitialCount();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [accessToken]);
+
+  // In src/components/pos/PosClientShell.tsx
+
+
+// Add this useEffect inside PosClientShell component:
+useEffect(() => {
+  const pusherKey = process.env.NEXT_PUBLIC_REVERB_APP_KEY || 'reverb_key';
+  if (!pusherKey || typeof window === 'undefined') return;
+
+  const pusher = new Pusher(pusherKey, {
+    cluster: process.env.NEXT_PUBLIC_REVERB_APP_CLUSTER || 'mt1',
+    wsHost: process.env.NEXT_PUBLIC_REVERB_HOST || '127.0.0.1',
+    wsPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT) || 8080,
+    forceTLS: false,
+    enabledTransports: ['ws', 'wss'],
+  });
+
+  const channel = pusher.subscribe('kds-channel');
+
+  // 🚀 LISTEN FOR REAL-TIME KIOSK ORDERS WITHOUT PAGE RELOAD
+  channel.bind('order-event', (data: any) => {
+    console.log('⚡ [Web POS] Real-time order event received:', data);
+    refreshKioskCount(); // 🚀 Instantly updates Unpaid Kiosk badge counter!
+  });
+
+  return () => {
+    pusher.unsubscribe('kds-channel');
+  };
+}, [refreshKioskCount]);
+
+  // 🚀 HARDENED WEB REFUND HANDLER
   const handleRefundOrder = async (orderId: number) => {
     // 1. Pre-check if order is already refunded in state
     const targetOrder = salesHistory.find((o) => o.id === orderId);
@@ -421,11 +516,23 @@ export default function PosClientShell({
         isOnline={isOnline}
         pendingSyncCount={pendingSyncCount}
         isSyncing={isSyncing}
+        unpaidKioskCount={unpaidKioskCount} // 🚀 Passed here
+        onOpenUnpaidKioskModal={() => setShowUnpaidKioskModal(true)} // 🚀 Passed here
         onTriggerSync={triggerAutoSync}
         onOpenSalesHistory={fetchSalesHistory}
         onOpenZClosure={() => setShowZClosureModal(true)}
       />
 
+      {/* Render Modal */}
+      {showUnpaidKioskModal && (
+        <PosKioskUnpaidModal
+          accessToken={accessToken}
+          onClose={() => setShowUnpaidKioskModal(false)}
+          onOrderPaid={() => {
+            refreshKioskCount();
+          }}
+        />
+      )}
       <div className="flex-1 flex overflow-hidden">
         <PosCategorySidebar
           categories={categories}

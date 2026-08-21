@@ -1,3 +1,27 @@
+export interface OptionItem {
+  id: number;
+  option_group_id: number;
+  name: string;
+  extra_price: number;
+  image_path?: string | null;
+  is_active?: boolean;
+}
+
+export interface OptionGroup {
+  id: number;
+  name: string;
+  selection_type: 'single_select' | 'multi_select';
+  is_required: boolean;
+  min_selections: number;
+  max_selections: number;
+  free_choice_limit: number;
+  options: OptionItem[];
+  pivot?: {
+    step_order: number;
+    free_choice_limit_override?: number | null;
+  };
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -11,9 +35,10 @@ export interface Product {
   amount?: any;
   vat_rate?: number | string; // 🚀 Dynamic TVA (5.50, 10.00, 20.00) from Laravel DB
   image_path: string | null;
-  is_active?: boolean;
-  category_id?: number;
   category_name?: string;
+  category_id?: number;
+  is_active?: boolean;
+  option_groups?: OptionGroup[]; // 🚀 Dynamic Kiosk Option Groups
 }
 
 export interface OrderItem {

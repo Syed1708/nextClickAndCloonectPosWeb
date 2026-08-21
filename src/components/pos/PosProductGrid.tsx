@@ -50,9 +50,11 @@ export default function PosProductGrid({
               >
                 <div className="relative w-full h-16 rounded-xl bg-zinc-800 overflow-hidden mb-2">
                   <Image
-                    src={getImageUrl(product.image)}
+                    src={getImageUrl(product.image_path)}
                     alt={product.name}
                     fill
+                    unoptimized
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" 
                     className="object-cover group-hover:scale-105 transition"
                   />
                 </div>
