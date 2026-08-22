@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Burger Palace Bordeaux — Complete Technical Architecture & System Specification</title>
+  <style>
+    :root {
+      --bg-main: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-amber: #f59e0b;
+      --accent-emerald: #10b981;
+      --accent-blue: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-rose: #f43f5e;
+      --code-bg: #090d16;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 30px;
+    }
+
+    .container {
+      max-w: 1200px;
+      margin: 0 auto;
+    }
+
+    /* HEADER BANNER */
+    .header-banner {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid var(--accent-amber);
+      border-radius: 24px;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .badge-tag {
+      background-color: rgba(245, 158, 11, 0.15);
+      border: 1px solid var(--accent-amber);
+      color: var(--accent-amber);
+      font-size: 11px;
+      font-weight: 900;
+      padding: 6px 14px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+
+    .header-title {
+      font-size: 36px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .header-subtitle {
+      color: var(--text-muted);
+      font-size: 16px;
+      margin-bottom: 25px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding-top: 20px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .meta-item span {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .meta-item font {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--accent-amber);
+    }
+
+    /* SECTION BOXES */
+    .section-box {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 900;
+      margin-bottom: 20px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 2px solid var(--card-border);
+      padding-bottom: 12px;
+    }
+
+    /* ASCII DIAGRAM */
+    .architecture-ascii {
+      background-color: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 12px;
+      color: var(--accent-amber);
+      overflow-x: auto;
+      white-space: pre;
+      margin-bottom: 20px;
+      line-height: 1.3;
+    }
+
+    /* FEATURE LISTS */
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: #cbd5e1;
+    }
+
+    li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--accent-emerald);
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    code {
+      background-color: var(--code-bg);
+      color: var(--accent-amber);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    /* TABLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    th {
+      background-color: rgba(15, 23, 42, 0.6);
+      color: var(--text-muted);
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+
+    tr:hover td {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .status-check {
+      color: var(--accent-emerald);
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .pill-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .pill-emerald { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .pill-amber { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .pill-blue { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .pill-purple { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.3); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      body { padding: 15px; }
+      .header-banner { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- HEADER BANNER -->
+    <div class="header-banner">
+      <span class="badge-tag">Headless Restaurant SaaS Ecosystem</span>
+      <h1 class="header-title">Burger Palace Bordeaux</h1>
+      <p class="header-subtitle">Executive Technical Architecture &amp; Complete System Specification</p>
+      
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span>Platform Type</span>
+          <font>Decoupled Multi-Platform SaaS</font>
+        </div>
+        <div class="meta-item">
+          <span>Compliance Standard</span>
+          <font>French NF525 Certified &amp; UK Compliant</font>
+        </div>
+        <div class="meta-item">
+          <span>Multi-Currency</span>
+          <font>EUR (€) / GBP (£)</font>
+        </div>
+        <div class="meta-item">
+          <span>Release Date</span>
+          <font>August 2026</font>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARCHITECTURE OVERVIEW -->
+    <div class="section-box">
+      <h2 class="section-title">🌐 1. Headless System Architecture Overview</h2>
+      
+      <div class="architecture-ascii">
+                            ┌──────────────────────────────────────────────┐
+                            │           LARAVEL BACKEND API CORE           │
+                            │             (api.burgerpalace.fr)            │
+                            └──────────────────────┬───────────────────────┘
+                                                   │
+      ┌────────────────────────────────────────────┼────────────────────────────────────────────┐
+      │                                            │                                            │
+      ▼                                            ▼                                            ▼
+ 📱 REACT NATIVE EXPO                       💻 NEXT.JS WEB APP                            👨‍🍳 KITCHEN KDS
+ (iOS / Android / Tablet)                    (burgerpalace.fr)                         (Chef &amp; Packer Screens)
+ ├── Offline SQLite Engine                  ├── Public Menu &amp; Ordering (/order)        ├── Real-Time Reverb WebSockets
+ ├── Touch Item Modifiers                   ├── Self-Service Kiosk (/kiosk)            ├── Dual-Tone Audio Alert
+ ├── Split Payment Mode                     ├── Table Reservations (/reservation)      ├── Order Type Badges
+ └── 80mm ESC/POS Printing                  └── Customer Portal &amp; Tracker (/profile)  └── Bright Yellow Note Boxes
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted);">
+        The platform features a decoupled, multi-platform REST architecture. The central Laravel API core powers a Next.js Web Client, a Touchscreen In-Store Kiosk, a Next.js Touch Web POS, a React Native Expo Mobile App, and real-time Kitchen Display Systems (KDS) synchronized via Laravel Reverb WebSockets.
+      </p>
+    </div>
+
+    <!-- PILLAR 1: LARAVEL BACKEND CORE -->
+    <div class="section-box">
+      <h2 class="section-title">⚙️ 2. Pillar 1: Laravel Backend Core &amp; API Engine</h2>
+      <ul>
+        <li><strong>Dual Authentication System:</strong> Decoupled authentication guards separating web customers (<code>clients</code> table) from staff, cashiers, and managers (<code>users</code> table managed by Tyro Dashboard).</li>
+        <li><strong>OrderSync Engine (<code>OrderSyncController.php</code>):</strong> Handles bulk transaction payloads from Web POS, Kiosk, and Expo Mobile. Auto-assigns gapless sequential ticket numbers (<code>1, 2, 3...</code>) and prevents duplicate processing via UUIDs.</li>
+        <li><strong>French NF525 Tax Compliance:</strong> Automatically calculates SHA-256 cryptographic hash chains (<code>hash</code> &amp; <code>previous_hash</code>) during transaction commits to satisfy French tax regulations.</li>
+        <li><strong>Stripe Payment Integration (<code>StripeWebController.php</code>):</strong> Secure payment session creation, fail-safe verification endpoint, and webhook listeners that auto-decrement raw ingredient inventory upon payment approval.</li>
+        <li><strong>Automated Order Rejection &amp; Refunds:</strong> 1-click order rejection automatically executes Stripe API <code>Refund::create()</code> and updates the customer live tracker with rejection reason notes.</li>
+        <li><strong>Real-Time Broadcaster (Laravel Reverb):</strong> Pushes instant WebSocket events (<code>KdsOrderUpdated</code> &amp; <code>ReservationUpdated</code>) to kitchen displays, hostess screens, and customer profile trackers.</li>
+      </ul>
+    </div>
+
+    <!-- PILLAR 2: NEXT.JS WEB PLATFORM -->
+    <div class="section-box">
+      <h2 class="section-title">💻 3. Pillar 2: Next.js Web Portal (App Router)</h2>
+      <ul>
+        <li><strong>Click &amp; Collect Portal (<code>/order</code>):</strong> Dynamic menu category filter chips, live search, 10-item pagination, floating cart badge, and slide-up item quantity sheet with promo code validation and loyalty points redemption.</li>
+        <li><strong>Intercepted Product Details &amp; Allergens (<code>/product/[id]</code>):</strong> Next.js 15+ Parallel Routes (<code>@modal</code>) and Intercepting Routes (<code>(.)product/[id]</code>) rendering product details in a modal overlay on click while preserving page state and scroll position.</li>
+        <li><strong>Customer Live Tracker &amp; Portal (<code>/profile</code>):</strong> Real-time Reverb WebSocket order tracking (<code>pending_acceptance</code> ➔ <code>accepted</code> ➔ <code>preparing</code> ➔ <code>ready</code> ➔ <code>delivered</code>), order history, table bookings manager, and profile updates.</li>
+        <li><strong>Item Customization Modal (<code>ItemModifierModal.tsx</code>):</strong> Allows cashiers and customers to select cooking levels (<em>Rare, Medium, Well Done</em>), exclusions (<em>No Onions</em>), and paid suppléments (<em>Extra Bacon +€1.50</em>).</li>
+        <li><strong>Global Store Status Guard:</strong> Automatically checks store status, operating schedules, and admin master toggles, disabling checkout buttons and rendering warning banners when ordering is closed.</li>
+      </ul>
+    </div>
+
+    <!-- PILLAR 3: IN-STORE SELF-SERVICE TOUCH KIOSK -->
+    <div class="section-box">
+      <h2 class="section-title">📱 4. Pillar 3: Touchscreen Kiosk Terminal (<code>/kiosk</code>)</h2>
+      <ul>
+        <li><strong>O'Tacos-Style Guided Step Builder:</strong> Middle-section step-by-step wizard (Size ➔ Cheese Sauce ➔ French Fries Placement ➔ Meats ➔ Sauces ➔ Extra Toppings ➔ Drinks) driven 100% dynamically from backend settings.</li>
+        <li><strong>Customer Identification Screen:</strong> Customer inputs Name/Phone, enters Client ID, or scans a Loyalty QR Code before starting an order.</li>
+        <li><strong>Smart Drink Combo Pricing Engine:</strong> Automatically applies discount pricing for soft drinks (<strong>€1.70</strong> when ordered in a Meal Combo vs <strong>€2.10</strong> A La Carte).</li>
+        <li><strong>Flexible Payment Options:</strong> Choice between <code>Pay by Card at Kiosk</code> (Stripe Terminal) or <code>Pay at Counter</code> (Cash/Card at Register).</li>
+        <li><strong>10-Second Screen Reset:</strong> Displays a large ticket number (e.g. <code>#T-102</code>) and auto-resets to Attract Mode screen saver for the next customer.</li>
+      </ul>
+    </div>
+
+    <!-- PILLAR 4: TABLE RESERVATIONS & HOSTESS SUBSYSTEM -->
+    <div class="section-box">
+      <h2 class="section-title">📅 5. Pillar 4: Table Reservations &amp; Hostess Management</h2>
+      <ul>
+        <li><strong>Web Customer Self-Booking (<code>/reservation</code>):</strong> Select date, time, guest count, and dining zone preference (<em>Indoor Room, Terrace, VIP Lounge</em>) with 24/7 future booking support and schedule validation.</li>
+        <li><strong>Table Collision Prevention:</strong> Automatically checks table capacity and blocks double-booking the same table within a 2-hour window.</li>
+        <li><strong>Interactive Admin Floor Plan (<code>/admin/reservations/floor-plan</code>):</strong> Real-time visual table grid displaying green/amber/red status badges (<code>AVAILABLE</code>, <code>RESERVED</code>, <code>OCCUPIED</code>) and 1-click hostess guest seating actions.</li>
+        <li><strong>Web POS Hostess Drawer (<code>/pos/reservations</code>):</strong> Cashier interface for viewing expected arrivals and recording fast phone call reservations.</li>
+      </ul>
+    </div>
+
+    <!-- PILLAR 5: BACK-OFFICE OPERATIONS & FINANCIAL P&L -->
+    <div class="section-box">
+      <h2 class="section-title">📈 6. Pillar 5: Back-Office Operations, HRM &amp; Financial P&amp;L</h2>
+      <div class="grid-2">
+        <div>
+          <h3 style="font-size: 15px; color: var(--accent-amber); margin-bottom: 10px;">📦 Supplier Purchases &amp; Inventory</h3>
+          <ul>
+            <li><strong>CSV Invoice Importer:</strong> Strictly validates supplier CSV invoices with PK binary magic-byte detection.</li>
+            <li><strong>Auto-Stock Incrementing:</strong> Receiving a delivery automatically increments ingredient stock levels in base storage units (g, ml, units).</li>
+            <li><strong>Auto Food Cost Expense:</strong> Automatically creates an Expense entry under <code>food_cost</code> category upon delivery.</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="font-size: 15px; color: var(--accent-amber); margin-bottom: 10px;">🗑️ Food Waste &amp; Loss Tracking</h3>
+          <ul>
+            <li><strong>Inventory Loss Logging:</strong> Tracks spilled, expired, or damaged food.</li>
+            <li><strong>Auto-Stock Decrementing:</strong> Automatically reduces ingredient stock levels upon logging waste.</li>
+            <li><strong>Auto Waste Loss Expense:</strong> Calculates financial loss (<code>qty × unit_cost</code>) and posts a <code>waste_loss</code> expense.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 20px;">
+        <div>
+          <h3 style="font-size: 15px; color: var(--accent-purple); margin-bottom: 10px;">👨‍🍳 HRM &amp; Multi-Region Payroll</h3>
+          <ul>
+            <li><strong>Contract Hours Tracking:</strong> Supports 35h, 39h, and 42h weekly contracts for French CDI/CDD/Extra &amp; UK staff.</li>
+            <li><strong>Total Employer Cost:</strong> Tracks <em>Net Pay + Employer Charges</em> (Cotisations Patronales / NI) to capture true labor expense.</li>
+            <li><strong>Auto-Payroll Expense:</strong> Marking payroll as paid automatically posts a <code>salaries</code> expense.</li>
+          </ul>
+        </div>
+        <div>
+          <h3 style="font-size: 15px; color: var(--accent-emerald); margin-bottom: 10px;">📊 Executive P&amp;L Financial Dashboard</h3>
+          <ul>
+            <li><strong>Real-Time Net Profit Calculation:</strong> Automatically calculates Net Operating Profit and Profit Margin Percentage:</li>
+            <p style="font-size: 11px; font-family: monospace; color: var(--accent-emerald); background: var(--code-bg); padding: 8px; border-radius: 8px; margin-top: 5px;">
+              Net Profit = Net Sales (HT) - Food Costs - Waste Losses - Labor Costs - Operating Overhead
+            </p>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PILLAR 6: KITCHEN DISPLAY SYSTEM & DISPATCHER -->
+    <div class="section-box">
+      <h2 class="section-title">👨‍🍳 7. Pillar 6: Kitchen Display System (KDS) &amp; Dispatcher</h2>
+      <ul>
+        <li><strong>Chef Screen (<code>chef.blade.php</code>):</strong> Listens on <code>kds-channel</code> via Reverb WebSockets. Plays a dual-tone audio alert on new orders. Displays high-contrast badges (<code>🛍️ ONLINE ORDER (TAKEAWAY)</code> vs <code>🍽️ DINE-IN</code>), customer names, and <strong>pulsing bright yellow callout boxes</strong> for item instructions (<em>"⚠️ NO ONIONS | EXTRA BACON"</em>).</li>
+        <li><strong>Packer Screen (<code>packer.blade.php</code>):</strong> Tracks kitchen preparation status (<code>Waiting for Kitchen</code>, <code>In Preparation</code>, <code>READY</code>), provides item verification checkboxes (<code>⬜</code> / <code>✅</code>), and triggers completion (<code>Served / Delivered</code>).</li>
+        <li><strong>Online Orders Dispatcher (<code>/admin/orders/online-management</code>):</strong> Continuous Uber-style chime alarm with 1-click ETA buttons (<code>15m</code>, <code>30m</code>, <code>45m</code>), automated Stripe refunds on rejection, and right-side live stats panel.</li>
+      </ul>
+    </div>
+
+    <!-- PILLAR 7: PROMO CODES & LOYALTY REWARDS -->
+    <div class="section-box">
+      <h2 class="section-title">🎟️ 8. Pillar 7: Customer Loyalty &amp; Promo Code Engine</h2>
+      <ul>
+        <li><strong>Promo Codes / Coupons:</strong> Supports percentage OFF (10%), fixed amount OFF (€5.00), minimum order thresholds (€20+), expiration dates, and global usage limits.</li>
+        <li><strong>1-Time Per Customer Safeguard:</strong> Automatically verifies customer history to ensure single-use welcome codes (`WELCOME10`) cannot be reused by the same client.</li>
+        <li><strong>Loyalty Points Engine:</strong> Automatically awards 1 point per €1 spent on completed orders. Logged-in customers with 100+ points can redeem 100 points for an instant <strong>€5.00 discount</strong> during checkout.</li>
+      </ul>
+    </div>
+
+    <!-- FEATURE MATRIX TABLE -->
+    <div class="section-box">
+      <h2 class="section-title">📊 9. Complete System Capability Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>System Capability</th>
+            <th style="text-align:center;">Web Client</th>
+            <th style="text-align:center;">Touch Kiosk</th>
+            <th style="text-align:center;">Web POS</th>
+            <th style="text-align:center;">KDS Screen</th>
+            <th style="text-align:center;">Admin Dashboard</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Real-Time Reverb WebSocket Sync</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>French NF525 SHA-256 Hash Chain</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>Dynamic Per-Product TVA (5.5%, 10%, 20%)</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>Dynamic Kiosk Step Builder</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>Table Reservations &amp; Seating</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>Loyalty Points &amp; Promo Redemption</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>Supplier Purchases &amp; Stock Addition</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>Food Waste Loss &amp; Auto-Expense</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+          <tr>
+            <td>HRM Payroll &amp; Executive P&amp;L</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td class="status-check">✓</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+</body>
+</html>

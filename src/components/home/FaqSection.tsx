@@ -1,48 +1,43 @@
-import { HelpCircle } from 'lucide-react';
+'use client';
 
-const FAQS = [
-  {
-    q: 'How long does my Click & Collect order take?',
-    a: 'Most orders take between 10 to 15 minutes. You can track the status live on your portal in real time.',
-  },
-  {
-    q: 'Where do I pick up my order?',
-    a: 'Pick up your order directly at our counter at 12 Rue Sainte-Catherine, 33000 Bordeaux.',
-  },
-  {
-    q: 'Can I pay in cash upon pickup?',
-    a: 'To ensure instant preparation and zero queue times, all web Click & Collect orders are paid securely via Stripe online.',
-  },
-  {
-    q: 'How do I know when my food is ready?',
-    a: 'Once your order is ready, your client tracking portal will show "Ready at Packing" in real time.',
-  },
-];
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { SiteSettings } from '@/types';
 
-export default function FaqSection() {
+export default function FaqSection({ settings }: { settings?: SiteSettings }) {
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
+  const primaryColor = settings?.primary_color || '#f59e0b';
+
+  const faqs = settings?.faq_items || [
+    { question: 'What are your Click & Collect pickup hours?', answer: 'Click & Collect is available during shift hours: 10:00 - 14:30 and 18:30 - 22:30.' },
+    { question: 'Are your meats Halal certified?', answer: 'Yes! All our meat options are 100% Halal certified.' },
+    { question: 'How do table reservations work?', answer: 'You can reserve a table online 24/7. Once confirmed, your table will be held for 15 minutes.' },
+  ];
+
   return (
-    <section className="py-20 bg-zinc-950 border-b border-zinc-800/60">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center max-w-2xl mx-auto mb-16 space-y-2">
-          <span className="text-amber-500 font-bold text-xs uppercase tracking-widest">
-            Got Questions?
-          </span>
-          <h2 className="text-3xl font-extrabold tracking-tight text-white">
-            Frequently Asked Questions
-          </h2>
-        </div>
+    <section className="py-16 max-w-4xl mx-auto px-6 w-full space-y-8">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-extrabold text-white">{settings?.faq_title || 'Frequently Asked Questions'}</h2>
+        <p className="text-zinc-400 text-sm">{settings?.faq_subtitle || 'Got questions? We have answers.'}</p>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-          {FAQS.map((faq, idx) => (
-            <div key={idx} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl space-y-2">
-              <div className="flex items-center gap-2 text-amber-400">
-                <HelpCircle className="w-5 h-5 shrink-0" />
-                <h3 className="font-bold text-white text-base">{faq.q}</h3>
+      <div className="space-y-3">
+        {faqs.map((faq: any, idx: number) => (
+          <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <button
+              onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
+              className="w-full p-5 text-left font-bold text-sm text-white flex justify-between items-center"
+            >
+              <span>{faq.question}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${openIdx === idx ? 'rotate-180' : ''}`} style={{ color: primaryColor }} />
+            </button>
+            {openIdx === idx && (
+              <div className="px-5 pb-5 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800/60 pt-3">
+                {faq.answer}
               </div>
-              <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed pl-7">{faq.a}</p>
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        ))}
       </div>
     </section>
   );

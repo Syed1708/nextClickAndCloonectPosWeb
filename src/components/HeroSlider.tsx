@@ -1,53 +1,100 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { getImageUrl } from '@/lib/api';
+import { SiteSettings } from '@/types';
 
-const SLIDES = [
+export interface HeroSlideItem {
+  id: number | string;
+  title: string;
+  subtitle?: string;
+  price?: string;
+  badge?: string;
+  image: string;
+  cta_text?: string;
+  cta_link?: string;
+}
+
+const DEFAULT_SLIDES: HeroSlideItem[] = [
   {
     id: 1,
     title: 'The Double Smash Truffle',
     subtitle: 'Aged French Cheddar, Black Truffle Mayo & Crispy Shallots',
     price: '€14.90',
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
     badge: 'Chef Special',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
+    cta_text: 'Order Now',
+    cta_link: '/order',
   },
   {
     id: 2,
     title: 'Bordeaux Bacon Supreme',
     subtitle: '100% Beef, Smoked Pork Belly, House BBQ Sauce & Brioche',
     price: '€13.50',
-    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=1200&q=80',
     badge: 'Best Seller',
+    image: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=1200&q=80',
+    cta_text: 'Order Now',
+    cta_link: '/order',
   },
   {
     id: 3,
     title: 'Le Spicy Avocado Crunchy',
     subtitle: 'Fresh Guacamole, Jalapeños, Pepper Jack Cheese',
     price: '€12.90',
-    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80',
     badge: 'New Arrival',
+    image: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80',
+    cta_text: 'Order Now',
+    cta_link: '/order',
   },
 ];
 
-export default function HeroSlider() {
+export default function HeroSlider({ settings }: { settings?: SiteSettings }) {
+  const primaryColor = settings?.primary_color || '#f59e0b';
+
+  // 🚀 Format dynamic slides from backend if available
+  const slides: HeroSlideItem[] = useMemo(() => {
+    if (settings?.hero_slides && Array.isArray(settings.hero_slides) && settings.hero_slides.length > 0) {
+      return settings.hero_slides.map((slide: any, idx: number) => ({
+        id: slide.id || idx + 1,
+        title: slide.title || settings.hero_title || 'Burger Palace Bordeaux',
+        subtitle: slide.subtitle || settings.hero_subtitle || 'Gourmet Artisanal Burgers',
+        price: slide.price || '',
+        badge: slide.badge || 'Featured',
+        image: slide.image_url || getImageUrl(slide.image_path) || DEFAULT_SLIDES[0].image,
+        cta_text: slide.cta_text || 'Order Now',
+        cta_link: slide.cta_link || '/order',
+      }));
+    }
+    return DEFAULT_SLIDES;
+  }, [settings]);
+
   const [current, setCurrent] = useState(0);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % SLIDES.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
+  // 🚀 REACT 19 COMPLIANT: Adjust state during render phase if slides count shrinks
+  if (current >= slides.length && slides.length > 0) {
+    setCurrent(0);
+  }
 
-  const nextSlide = () => setCurrent((prev) => (prev + 1) % SLIDES.length);
-  const prevSlide = () => setCurrent((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+  // 🚀 Auto-slide interval (Purely async inside setInterval, zero sync setState in effect body)
+  useEffect(() => {
+    if (slides.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % slides.length);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  const nextSlide = () => setCurrent((prev) => (prev + 1) % slides.length);
+  const prevSlide = () => setCurrent((prev) => (prev - 1 + slides.length) % slides.length);
 
   return (
-    <div className="relative h-130 w-full overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-      {SLIDES.map((slide, idx) => (
+    <div className="relative h-112 sm:h-130 w-full overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+      {slides.map((slide, idx) => (
         <div
           key={slide.id}
           className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
@@ -58,27 +105,45 @@ export default function HeroSlider() {
             src={slide.image}
             alt={slide.title}
             fill
+            unoptimized
             className="object-cover brightness-50"
             priority={idx === 0}
           />
-          <div className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/40 to-transparent p-8 sm:p-12 flex flex-col justify-end">
-            <div className="max-w-xl space-y-4">
-              <span className="inline-flex items-center gap-1.5 bg-amber-500 text-zinc-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                <Star className="w-3.5 h-3.5 fill-zinc-950" /> {slide.badge}
-              </span>
+          <div className="absolute inset-0 bg-linear-to-t from-zinc-950 via-zinc-950/40 to-transparent p-6 sm:p-12 flex flex-col justify-end">
+            <div className="max-w-2xl space-y-3 sm:space-y-4">
+              {slide.badge && (
+                <span
+                  className="inline-flex items-center gap-1.5 text-zinc-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-md"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Star className="w-3.5 h-3.5 fill-zinc-950" /> {slide.badge}
+                </span>
+              )}
+
               <h2 className="text-3xl sm:text-5xl font-black text-white leading-tight">
                 {slide.title}
               </h2>
-              <p className="text-zinc-300 text-sm sm:text-base font-medium">
-                {slide.subtitle}
-              </p>
+
+              {slide.subtitle && (
+                <p className="text-zinc-300 text-xs sm:text-base font-medium line-clamp-2">
+                  {slide.subtitle}
+                </p>
+              )}
+
               <div className="flex items-center gap-4 pt-2">
-                <span className="text-amber-400 text-2xl font-black">{slide.price}</span>
+                {slide.price && (
+                  <span className="text-2xl font-black" style={{ color: primaryColor }}>
+                    {slide.price}
+                  </span>
+                )}
+
                 <Link
-                  href="/order"
-                  className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold px-6 py-3 rounded-xl flex items-center gap-2 text-sm transition transform hover:scale-105"
+                  href={slide.cta_link || '/order'}
+                  className="text-zinc-950 font-extrabold px-6 py-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm transition transform hover:scale-105 shadow-lg"
+                  style={{ backgroundColor: primaryColor }}
                 >
-                  Order Now <ArrowRight className="w-4 h-4" />
+                  <span>{slide.cta_text || 'Order Now'}</span>
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
@@ -86,32 +151,37 @@ export default function HeroSlider() {
         </div>
       ))}
 
-      {/* Slide Navigation Buttons */}
-      <button
-        onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-zinc-900/80 hover:bg-zinc-800 text-white p-3 rounded-full backdrop-blur border border-zinc-700/50 transition"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <button
-        onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-zinc-900/80 hover:bg-zinc-800 text-white p-3 rounded-full backdrop-blur border border-zinc-700/50 transition"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-
-      {/* Slider Indicators */}
-      <div className="absolute bottom-4 right-8 z-20 flex gap-2">
-        {SLIDES.map((_, idx) => (
+      {/* Slide Navigation Controls (Only shown if > 1 slide) */}
+      {slides.length > 1 && (
+        <>
           <button
-            key={idx}
-            onClick={() => setCurrent(idx)}
-            className={`h-2 rounded-full transition-all ${
-              idx === current ? 'w-8 bg-amber-500' : 'w-2 bg-zinc-600'
-            }`}
-          />
-        ))}
-      </div>
+            onClick={prevSlide}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-zinc-900/80 hover:bg-zinc-800 text-white p-3 rounded-full backdrop-blur border border-zinc-700/50 transition"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={nextSlide}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-zinc-900/80 hover:bg-zinc-800 text-white p-3 rounded-full backdrop-blur border border-zinc-700/50 transition"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+
+          {/* Slider Indicators */}
+          <div className="absolute bottom-4 right-8 z-20 flex gap-2">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrent(idx)}
+                className={`h-2 rounded-full transition-all ${
+                  idx === current ? 'w-8' : 'w-2 bg-zinc-600'
+                }`}
+                style={{ backgroundColor: idx === current ? primaryColor : undefined }}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

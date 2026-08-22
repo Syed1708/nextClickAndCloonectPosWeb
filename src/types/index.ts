@@ -23,6 +23,7 @@ export interface OptionGroup {
 }
 
 export interface Product {
+  category: any;
   id: number;
   name: string;
   description?: string;
@@ -132,4 +133,60 @@ export interface CartItem {
   quantity: number;
   notes?: string[];
   extraPrice?: number; // Stores extra cost from paid suppléments (+€1.50 Bacon, etc.)
+}
+
+
+export interface SiteSettings {
+  id?: number;
+  country?: string;
+  currency?: string;
+  logo_url?: string | null;
+  favicon_url?: string | null;
+  hero_title: string;
+  hero_subtitle?: string;
+  hero_slides?: any[];
+  promo_banner_text?: string;
+  promo_active?: boolean;
+  
+  // Section Visibility Toggles
+  show_how_it_works?: boolean;
+  show_featured?: boolean;
+  show_why_choose_us?: boolean;
+  show_newsletter?: boolean;
+  show_faq?: boolean;
+  show_about?: boolean;
+  show_contact?: boolean;
+
+  // Dynamic Section Content
+  how_it_works_title?: string;
+  how_it_works_subtitle?: string;
+  how_it_works_steps?: Array<{ step: number; title: string; description: string }>;
+
+  why_choose_us_title?: string;
+  why_choose_us_subtitle?: string;
+  why_choose_us_items?: Array<{ icon: string; title: string; description: string }>;
+
+  faq_title?: string;
+  faq_subtitle?: string;
+  faq_items?: Array<{ question: string; answer: string }>;
+
+  about_title?: string;
+  about_text?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  contact_address?: string;
+  google_maps_iframe?: string;
+
+  // Theme
+  primary_color?: string;
+  secondary_color?: string;
+  font_family?: string;
+  border_radius?: string;
+
+  // Operations
+  is_store_open?: boolean;
+  online_orders_enabled?: boolean;
+  reservations_enabled?: boolean;
+  schedule?: string;
+  closed_message?: string;
 }

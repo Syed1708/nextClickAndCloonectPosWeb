@@ -145,4 +145,52 @@ export async function fetchUserOrders(token: string): Promise<Order[]> {
     console.error('Orders Fetch Error:', err);
     return [];
   }
+
+}
+
+export async function fetchSiteSettings() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/site-settings`, {
+      // next: { revalidate: 60 }, // ISR: Revalidates every 60 seconds
+     cache: 'no-store', // 🚀 FORCES FRESH DATA FROM LARAVEL ON EVERY REFRESH!
+
+    });
+    if (!res.ok) throw new Error('Failed to fetch site settings');
+    return await res.json();
+  } catch (error) {
+    console.error('fetchSiteSettings error:', error);
+    // Fallback default settings if API is unavailable
+    return {
+      hero_title: 'Burger Palace Bordeaux',
+      hero_subtitle: 'Executive Gourmet Burgers prepared fresh with local ingredients.',
+      promo_banner_text: '🔥 10% OFF on all Click & Collect orders tonight!',
+      promo_active: true,
+      primary_color: '#f59e0b',
+      secondary_color: '#10b981',
+      font_family: 'sans-serif',
+      show_how_it_works: true,
+      show_featured: true,
+      show_why_choose_us: true,
+      show_newsletter: true,
+      show_faq: true,
+      show_contact: true,
+      how_it_works_title: '3 Easy Steps to Order',
+      how_it_works_subtitle: 'Fast, simple, and delicious gourmet dining.',
+      why_choose_us_title: 'Why Burger Palace?',
+      why_choose_us_subtitle: 'Uncompromising quality in every single bite.',
+      faq_title: 'Frequently Asked Questions',
+      faq_subtitle: 'Got questions? We have answers.',
+      about_title: 'Gourmet Passion in Bordeaux',
+      about_text: 'Founded in 2026, Burger Palace brings gourmet artisanal burgers to the heart of Bordeaux.',
+      contact_email: 'contact@burgerpalace.fr',
+      contact_phone: '+33 5 56 00 00 00',
+      contact_address: '12 Rue Sainte-Catherine, 33000 Bordeaux',
+      google_maps_iframe: '',
+      is_store_open: true,
+      online_orders_enabled: true,
+      reservations_enabled: true,
+      schedule: '10:00 - 14:30 & 18:30 - 22:30',
+      closed_message: 'Restaurant is currently closed.',
+    };
+  }
 }
