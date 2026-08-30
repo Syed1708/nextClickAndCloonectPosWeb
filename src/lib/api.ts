@@ -1,6 +1,6 @@
 import { Product } from "../types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
 export interface User {
   id: number;
@@ -28,7 +28,7 @@ export interface Order {
 }
 
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
 export function formatPrice(price: any): string {
   if (price === null || price === undefined || price === '') return '0.00';
@@ -38,19 +38,6 @@ export function formatPrice(price: any): string {
   return num.toFixed(2);
 }
 
-// export function getImageUrl(imagePath: string | null | undefined): string {
-  
-//   if (!imagePath || imagePath === 'null' || imagePath === 'undefined' || imagePath.trim() === '') {
-//     return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" fill="%2318181b"><rect width="400" height="300"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%2371717a" font-family="sans-serif" font-size="16" font-weight="bold">Burger Palace</text></svg>`;
-//   }
-//   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-//     return imagePath;
-//   }
-//   return `${API_BASE_URL}/storage/${imagePath.replace(/^\//, '')}`;
-// }
-
-
-// src/lib/api.ts
 
 export function getImageUrl(imagePath?: string | null): string {
   if (!imagePath) {
@@ -62,10 +49,10 @@ export function getImageUrl(imagePath?: string | null): string {
     return imagePath;
   }
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
   const cleanPath = imagePath.replace(/^\/+/, ''); // Strip leading slashes
 
-  // 🚀 Converts "uploads/eSP165p..." to "http://127.0.0.1:8000/storage/uploads/eSP165p..."
+  // 🚀 Converts "uploads/eSP165p..." to "http://127.0.0.1:8000/api/v1/storage/uploads/eSP165p..."
   if (cleanPath.startsWith('uploads/')) {
     return `${apiBase}/storage/${cleanPath}`;
   }
@@ -150,7 +137,7 @@ export async function fetchUserOrders(token: string): Promise<Order[]> {
 
 export async function fetchSiteSettings() {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/site-settings`, {
+    const res = await fetch(`${API_BASE_URL}/site-settings`, {
       // next: { revalidate: 60 }, // ISR: Revalidates every 60 seconds
      cache: 'no-store', // 🚀 FORCES FRESH DATA FROM LARAVEL ON EVERY REFRESH!
 

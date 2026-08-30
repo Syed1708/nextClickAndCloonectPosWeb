@@ -15,31 +15,31 @@ const geistMono = Geist_Mono({
 });
 
 // 🚀 DYNAMIC FAVICON & METADATA FROM LARAVEL CMS
-export async function generateMetadata(): Promise<Metadata> {
-  const settings = await fetchSiteSettings();
+// export async function generateMetadata(): Promise<Metadata> {
+//   const settings = await fetchSiteSettings();
   
-  // Use uploaded favicon URL or fallback to /favicon.svg
-  const faviconUrl = settings?.favicon_url;
+//   // Use uploaded favicon URL or fallback to /favicon.svg
+//   const faviconUrl = settings?.favicon_url;
 
- return {
-    title: settings.hero_title || 'Burger Palace Bordeaux',
-    description: settings.hero_subtitle || 'Gourmet Artisanal Burgers & Click & Collect',
-    icons: [
-      {
-        rel: 'icon',
-        url: `${faviconUrl}?v=3.0`, // 🚀 Supports JPG, PNG, and SVG dynamically!
-      },
-      {
-        rel: 'shortcut icon',
-        url: `${faviconUrl}?v=3.0`,
-      },
-      {
-        rel: 'apple-touch-icon',
-        url: `${faviconUrl}?v=3.0`,
-      },
-    ],
-  };
-}
+//  return {
+//     title: settings.hero_title || 'Burger Palace Bordeaux',
+//     description: settings.hero_subtitle || 'Gourmet Artisanal Burgers & Click & Collect',
+//     icons: [
+//       {
+//         rel: 'icon',
+//         url: `${faviconUrl}?v=3.0`, // 🚀 Supports JPG, PNG, and SVG dynamically!
+//       },
+//       {
+//         rel: 'shortcut icon',
+//         url: `${faviconUrl}?v=3.0`,
+//       },
+//       {
+//         rel: 'apple-touch-icon',
+//         url: `${faviconUrl}?v=3.0`,
+//       },
+//     ],
+//   };
+// }
 
 export default function RootLayout({
   

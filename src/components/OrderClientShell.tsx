@@ -19,9 +19,9 @@ import {
   Tag,
   Gift,
 } from 'lucide-react';
-import { Product } from '../types';
-import { getImageUrl, formatPrice } from '../lib/api';
-import ItemModifierModal from '../components/client/ItemModifierModal';
+import { Product } from '@/types';
+import { getImageUrl, formatPrice } from '@/lib/api';
+import ProductStepModal from '@/components/common/ProductStepModal';
 
 export interface CartItem {
   product: Product;
@@ -35,7 +35,7 @@ interface OrderClientShellProps {
   isLoggedIn: boolean;
   accessToken: string | null;
   userName: string | null;
-   initialPoints?: number;
+  initialPoints?: number;
 }
 
 export default function OrderClientShell({
@@ -53,39 +53,37 @@ export default function OrderClientShell({
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [visibleCount, setVisibleCount] = useState(10);
 
-  // Active product selected for modifier modal
-  const [selectedProductForModifier, setSelectedProductForModifier] = useState<Product | null>(null);
+  // Active product selected for step customization modal
+  const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
 
-  // 🚀 PROMO CODE & LOYALTY POINTS STATE
+  // Promo Code & Loyalty Points State
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_amount: number } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
-
- 
   const [redeemPoints, setRedeemPoints] = useState<boolean>(false);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
-  // Store Opening & Global Settings State
+  // Store Opening & Global Schedule State
   const [storeStatus, setStoreStatus] = useState<{
-    is_open: boolean;                 // Current time is within shift schedule
-    is_store_open: boolean;           // Master Admin Toggle
-    online_orders_enabled: boolean;   // Online Ordering Toggle
+    is_open: boolean;
+    is_store_open: boolean;
+    online_orders_enabled: boolean;
     schedule: string;
     closed_message: string;
   }>({
     is_open: true,
     is_store_open: true,
     online_orders_enabled: true,
-    schedule: '10:00 - 14:30 & 18:30 - 06:30',
+    schedule: '10:00 - 14:30 & 18:30 - 22:30',
     closed_message: 'Restaurant is currently closed for online ordering.',
   });
 
   useEffect(() => {
     async function checkStoreStatus() {
       try {
-        const res = await fetch(`${API_BASE}/api/store-status`);
+        const res = await fetch(`${API_BASE}/store-status`);
         if (res.ok) {
           const data = await res.json();
           setStoreStatus(data);
@@ -97,17 +95,16 @@ export default function OrderClientShell({
     checkStoreStatus();
   }, [API_BASE]);
 
-   const [clientPoints, setClientPoints] = useState<number>(initialPoints);
-// 🚀 Local Points State initialized with initialPoints prop
+  // Client Loyalty Points State
+  const [clientPoints, setClientPoints] = useState<number>(initialPoints);
   const [prevInitialPoints, setPrevInitialPoints] = useState<number>(initialPoints);
 
-  // 🚀 REACT 19 COMPLIANT PROP SYNC: Adjusts state during render without useEffect!
+  // React 19 Prop Sync
   if (prevInitialPoints !== initialPoints) {
     setPrevInitialPoints(initialPoints);
     setClientPoints(initialPoints);
   }
 
-  // 🚀 ASYNCHRONOUS API REFETCH (Zero Synchronous setState Calls in Effect Body)
   useEffect(() => {
     if (!isLoggedIn || !accessToken) return;
 
@@ -115,10 +112,10 @@ export default function OrderClientShell({
 
     async function fetchPoints() {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/client/profile`, {
+        const res = await fetch(`${API_BASE}/client/profile`, {
           headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
+            Accept: 'application/json',
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
@@ -131,7 +128,7 @@ export default function OrderClientShell({
             0;
 
           if (!isCancelled) {
-            setClientPoints(Number(points)); // Called asynchronously after fetch promise resolves
+            setClientPoints(Number(points));
           }
         }
       } catch (e) {
@@ -145,8 +142,6 @@ export default function OrderClientShell({
       isCancelled = true;
     };
   }, [API_BASE, isLoggedIn, accessToken]);
- 
-
 
   // Master Permission Check for Online Ordering
   const canOrderOnline =
@@ -160,19 +155,19 @@ export default function OrderClientShell({
 
   const categories = [
     'All',
-    ...Array.from(new Set(products.map((p) => p.category_name || 'Burgers'))),
+    ...Array.from(new Set(products.map((p) => p.category_name || (p.category?.name ?? 'Burgers')))),
   ];
 
   const filteredProducts = products.filter((product) => {
+    const categoryName = product.category_name || product.category?.name || 'Burgers';
     const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory =
-      selectedCategory === 'All' || (product.category_name || 'Burgers') === selectedCategory;
+    const matchesCategory = selectedCategory === 'All' || categoryName === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
-  // Add to Cart
+  // Add Item to Cart (with Notes & Options)
   const addToCartWithNotes = (
     product: Product,
     notes: string[] = [],
@@ -213,9 +208,9 @@ export default function OrderClientShell({
     );
   };
 
-  // 🚀 SUBTOTAL & DISCOUNT CALCULATIONS
+  // Subtotal & Discount Math
   const subtotalAmount = cart.reduce((sum, item) => {
-    const priceVal = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
+    const priceVal = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
     const unitPriceWithExtras = priceVal + (item.extraPrice || 0);
     return sum + unitPriceWithExtras * item.quantity;
   }, 0);
@@ -228,42 +223,41 @@ export default function OrderClientShell({
   const finalTotalAmount = Math.max(0, subtotalAmount - totalDiscount);
   const totalItemsCount = cart.reduce((a, c) => a + c.quantity, 0);
 
+  // Promo Code Validation Handler
+  const handleApplyPromoCode = async () => {
+    if (!promoCodeInput.trim()) return;
+    setIsApplyingPromo(true);
+    setPromoError(null);
 
-// 🚀 FIX: Sends Bearer Token so backend knows who is applying the code
-const handleApplyPromoCode = async () => {
-  if (!promoCodeInput.trim()) return;
-  setIsApplyingPromo(true);
-  setPromoError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/coupons/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          code: promoCodeInput,
+          subtotal: subtotalAmount,
+        }),
+      });
 
-  try {
-    const res = await fetch(`${API_BASE}/api/coupons/validate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), // 🚀 Sends Login Token
-      },
-      body: JSON.stringify({
-        code: promoCodeInput,
-        subtotal: subtotalAmount,
-      }),
-    });
-
-    const data = await res.json();
-    if (res.ok && data.valid) {
-      setAppliedCoupon({ code: data.code, discount_amount: data.discount_amount });
-      setPromoCodeInput('');
-    } else {
-      setPromoError(data.message || 'Invalid promo code.');
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setAppliedCoupon({ code: data.code, discount_amount: data.discount_amount });
+        setPromoCodeInput('');
+      } else {
+        setPromoError(data.message || 'Invalid promo code.');
+      }
+    } catch (err) {
+      setPromoError('Error validating promo code.');
+    } finally {
+      setIsApplyingPromo(false);
     }
-  } catch (err) {
-    setPromoError('Error validating promo code.');
-  } finally {
-    setIsApplyingPromo(false);
-  }
-};
+  };
 
-  // 🚀 CHECKOUT SUBMISSION WITH PROMO CODE & POINTS
+  // Checkout Handler (Stripe Checkout Session)
   const handleProceedToCheckout = async () => {
     if (!canOrderOnline) {
       alert(storeStatus.closed_message || 'Online ordering is currently closed.');
@@ -301,11 +295,11 @@ const handleApplyPromoCode = async () => {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.message || 'Could not launch Stripe Checkout session');
+        alert(data.message || 'Could not launch Stripe Checkout session.');
       }
     } catch (err) {
       console.error(err);
-      alert('Error connecting to payment provider');
+      alert('Error connecting to payment provider.');
     } finally {
       setIsProcessingCheckout(false);
     }
@@ -349,7 +343,7 @@ const handleApplyPromoCode = async () => {
         {/* Left: Product Catalog */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Warning Banner when Ordering Closed */}
+          {/* Warning Banner when Ordering is Closed */}
           {!canOrderOnline && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-2xl flex items-start gap-3 text-xs sm:text-sm font-semibold">
               <AlertCircle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
@@ -405,17 +399,26 @@ const handleApplyPromoCode = async () => {
           {/* Product Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {displayedProducts.map((product) => {
-              const displayPrice = formatPrice(product.price || (product as Product).unit_price);
+              const displayPrice = formatPrice(product.price || (product as any).unit_price);
+              const categoryName = product.category_name || product.category?.name;
+              const optionGroups = (product as any).option_groups || (product as any).optionGroups || [];
+              const hasCustomizationSteps = optionGroups.length > 0;
 
               return (
                 <div key={product.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between group">
                   <div className="relative h-36 sm:h-44 w-full bg-zinc-800">
-                    <Image src={getImageUrl(product.image_path)} alt={product.name} unoptimized fill className="object-cover group-hover:scale-105 transition" />
+                    <Image
+                      src={getImageUrl(product.image_path || (product as any).image)}
+                      alt={product.name}
+                      unoptimized
+                      fill
+                      className="object-cover group-hover:scale-105 transition"
+                    />
                     
-                    {/* 🚀 MORE INFO LINK OVERLAY ON IMAGE */}
+                    {/* Modal Details Interception Button */}
                     <Link
                       href={`/product/${product.id}`}
-                      scroll={false} // 🚀 Triggers Intercepted Route Modal without losing scroll position!
+                      scroll={false}
                       className="absolute top-3 right-3 bg-zinc-950/80 hover:bg-zinc-800 text-amber-400 p-2 rounded-xl backdrop-blur border border-zinc-800 transition"
                       title="View Details & Allergens"
                     >
@@ -425,9 +428,9 @@ const handleApplyPromoCode = async () => {
 
                   <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
                     <div>
-                      {product.category_name && (
+                      {categoryName && (
                         <span className="text-[9px] sm:text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                          {product.category_name}
+                          {categoryName}
                         </span>
                       )}
                       <div className="flex justify-between items-start mt-0.5">
@@ -435,7 +438,6 @@ const handleApplyPromoCode = async () => {
                         <span className="text-amber-400 font-extrabold text-sm sm:text-base">€{displayPrice}</span>
                       </div>
                       
-                      {/* 🚀 RICH TEXT DESCRIPTION RENDERER */}
                       <div
                         className="text-zinc-400 text-[11px] sm:text-xs mt-1 line-clamp-2 [&_p]:m-0 [&_strong]:text-zinc-200"
                         dangerouslySetInnerHTML={{
@@ -445,24 +447,29 @@ const handleApplyPromoCode = async () => {
                     </div>
                     
                     <div className="flex gap-2 mt-3 sm:mt-4">
-                      {/* 🚀 MORE INFO LINK BUTTON */}
                       <Link
                         href={`/product/${product.id}`}
-                        scroll={false} // 🚀 Triggers Intercepted Route Modal without losing scroll position!
+                        scroll={false}
                         className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 rounded-xl transition flex items-center justify-center shrink-0"
                         title="View Details & Allergens"
                       >
                         <Info className="w-4 h-4" />
                       </Link>
 
-                      {/* ADD TO ORDER BUTTON */}
+                      {/* 🚀 SMART FAST-ADD vs STEP CUSTOMIZATION BUTTON */}
                       <button
                         disabled={!canOrderOnline}
-                        onClick={() => setSelectedProductForModifier(product)}
+                        onClick={() => {
+                          if (hasCustomizationSteps) {
+                            setSelectedProductForModal(product); // Opens Dynamic Step Wizard
+                          } else {
+                            addToCartWithNotes(product, [], 0); // Fast 1-Click Add
+                          }
+                        }}
                         className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-bold py-2 sm:py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs transition disabled:cursor-not-allowed"
                       >
                         <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        {!canOrderOnline ? 'Closed' : 'Add to Order'}
+                        {!canOrderOnline ? 'Closed' : hasCustomizationSteps ? 'Customize & Add' : 'Add to Order'}
                       </button>
                     </div>
                   </div>
@@ -493,7 +500,7 @@ const handleApplyPromoCode = async () => {
           ) : (
             <div className="space-y-4 max-h-60 overflow-y-auto pr-1">
               {cart.map((item, index) => {
-                const basePrice = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
+                const basePrice = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
                 const itemUnitPrice = basePrice + (item.extraPrice || 0);
 
                 return (
@@ -529,7 +536,7 @@ const handleApplyPromoCode = async () => {
             </div>
           )}
 
-          {/* 🚀 PROMO CODE SECTION */}
+          {/* Promo Code Section */}
           {cart.length > 0 && (
             <div className="space-y-2 pt-2 border-t border-zinc-800">
               <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
@@ -565,7 +572,7 @@ const handleApplyPromoCode = async () => {
             </div>
           )}
 
-          {/* 🚀 LOYALTY POINTS REDEMPTION SECTION */}
+          {/* Loyalty Points Redemption Section */}
           {isLoggedIn && clientPoints >= 100 && cart.length > 0 && (
             <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl space-y-1.5">
               <div className="flex justify-between items-center text-xs">
@@ -583,7 +590,7 @@ const handleApplyPromoCode = async () => {
             </div>
           )}
 
-          {/* TOTALS BREAKDOWN */}
+          {/* Totals Breakdown */}
           <div className="border-t border-zinc-800 pt-3 space-y-3">
             <div className="space-y-1 text-xs text-zinc-400">
               <div className="flex justify-between">
@@ -621,7 +628,7 @@ const handleApplyPromoCode = async () => {
         </div>
       </div>
 
-      {/* Floating Shopping Bag Button */}
+      {/* Floating Cart Button for Mobile */}
       {totalItemsCount > 0 && (
         <button
           onClick={() => setIsMobileCartOpen(true)}
@@ -635,7 +642,7 @@ const handleApplyPromoCode = async () => {
         </button>
       )}
 
-      {/* Mobile / Tablet Cart Drawer */}
+      {/* Mobile Cart Drawer */}
       {isMobileCartOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end lg:hidden animate-in fade-in duration-200">
           <div className="bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-5 sm:p-6 space-y-5 max-h-[85vh] flex flex-col shadow-2xl">
@@ -659,7 +666,7 @@ const handleApplyPromoCode = async () => {
                 <p className="text-zinc-500 text-center py-8 text-sm">Your order list is empty.</p>
               ) : (
                 cart.map((item, index) => {
-                  const basePrice = parseFloat(formatPrice(item.product.price || (item.product as Product).unit_price));
+                  const basePrice = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
                   const itemUnitPrice = basePrice + (item.extraPrice || 0);
 
                   return (
@@ -788,14 +795,14 @@ const handleApplyPromoCode = async () => {
         </div>
       )}
 
-      {/* Item Modifier Modal */}
-      {selectedProductForModifier && (
-        <ItemModifierModal
-          product={selectedProductForModifier}
-          onClose={() => setSelectedProductForModifier(null)}
+      {/* Unified Dynamic Step Customizer Modal */}
+      {selectedProductForModal && (
+        <ProductStepModal
+          product={selectedProductForModal}
+          onClose={() => setSelectedProductForModal(null)}
           onConfirm={(product, notes, extraPrice) => {
             addToCartWithNotes(product, notes, extraPrice);
-            setSelectedProductForModifier(null);
+            setSelectedProductForModal(null);
           }}
         />
       )}

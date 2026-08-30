@@ -66,7 +66,7 @@ export default function KioskClientShell({ initialProducts }: { initialProducts:
   const [completedTicket, setCompletedTicket] = useState<{ ticketNumber: string; total: number } | null>(null);
   const [autoResetTimer, setAutoResetTimer] = useState(10);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
 
   const getProductCategory = (p: Product) => p.category?.name || (p as any).category_name || 'Uncategorized';
 
@@ -87,17 +87,11 @@ export default function KioskClientShell({ initialProducts }: { initialProducts:
     });
   }, [cart]);
 
-  const getItemUnitPrice = useCallback((item: KioskCartItem) => {
-    const isDrink = (getProductCategory(item.product) || '').toLowerCase().includes('drink') ||
-                    (getProductCategory(item.product) || '').toLowerCase().includes('beverage');
-
-    if (isDrink) {
-      return hasBurgerInCart ? 1.70 : 2.10; // €1.70 Combo vs €2.10 A La Carte
-    }
-
-    const basePrice = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
-    return basePrice + item.extraPrice;
-  }, [hasBurgerInCart]);
+// 🚀 CLEAN & DYNAMIC: Uses real DB prices and dynamic step add-ons
+const getItemUnitPrice = useCallback((item: KioskCartItem) => {
+  const basePrice = parseFloat(formatPrice(item.product.price || (item.product as any).unit_price));
+  return basePrice + (item.extraPrice || 0);
+}, []);
 
   const totalAmount = cart.reduce((sum, item) => sum + getItemUnitPrice(item) * item.quantity, 0);
   const totalItemCount = cart.reduce((a, c) => a + c.quantity, 0);
