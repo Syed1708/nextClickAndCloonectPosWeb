@@ -2,28 +2,24 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, Mail, Loader2, ArrowLeft, User } from 'lucide-react';
 
 export default function CustomerLoginPage() {
-
-    const searchParams = useSearchParams();
-  
-  // 🚀 2. Read callbackUrl from URL parameter (default to /client/profile)
+  const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/client/profile';
-  // const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    // 🚀 Uses 'client-credentials' provider to validate against 'clients' table!
     const result = await signIn('client-credentials', {
       email,
       password,
@@ -31,12 +27,9 @@ export default function CustomerLoginPage() {
     });
 
     if (result?.error) {
-      setError('Invalid customer email or password');
+      setError('Invalid customer email address or password');
       setLoading(false);
     } else {
-      // router.push('/client/profile');
-      // router.refresh();
-      // 🚀 3. Redirects to callbackUrl (/reservation) or /client/profile
       window.location.href = callbackUrl;
     }
   };
@@ -56,7 +49,7 @@ export default function CustomerLoginPage() {
             <User className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-black">Customer Sign In</h1>
-          <p className="text-zinc-400 text-xs mt-1">Sign in to track orders & manage profile</p>
+          <p className="text-zinc-400 text-xs mt-1">Sign in to track orders, manage bookings & loyalty rewards</p>
         </div>
 
         {error && (
@@ -82,7 +75,16 @@ export default function CustomerLoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-400 mb-1">Password</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-xs font-semibold text-zinc-400">Password</label>
+              {/* 🚀 FORGOT PASSWORD LINK */}
+              <Link
+                href="/client/forgot-password"
+                className="text-[11px] text-amber-400 hover:underline font-semibold"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
